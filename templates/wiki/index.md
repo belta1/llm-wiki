@@ -11,10 +11,29 @@ description of what this project is and does: _<fill in>_.
 
 ## Stack
 
-- **Languages / runtime:** _<e.g. TypeScript, Node 20>_
-- **Build / package:** _<e.g. pnpm, Vite>_
-- **Test:** _<e.g. Vitest — `pnpm test>`_
-- **Run locally:** _<e.g. `pnpm dev>`_
+_Fill with the REAL commands for this repo (inferred from the lockfile / scripts), not guesses._
+
+- **Language / runtime:** _<e.g. TypeScript, Node 20 — or Python 3.12>_
+- **Package manager:** _<e.g. pnpm (`pnpm-lock.yaml`) — or uv (`uv.lock`)>_
+- **Run locally:** _<e.g. `pnpm dev` — or `uv run uvicorn app.main:app --reload`>_
+- **Build:** _<e.g. `pnpm build` — or n/a>_
+- **Test:** _<e.g. `pnpm test` — or `uv run pytest`>_ · single: _<e.g. `pnpm test -- <file>`>_
+- **Lint / format:** _<e.g. `pnpm lint` / `pnpm format` — or `uv run ruff check` / `ruff format`>_
+- **Typecheck:** _<e.g. `pnpm typecheck` — or `uv run mypy <pkg>`>_
+
+<!-- Monorepo OR hybrid (multi-language) repos: list each package/component with its OWN toolchain.
+     Delete this block for single-component repos.
+## Components
+
+| Component | Path | Toolchain | Purpose | Module page |
+|-----------|------|-----------|---------|-------------|
+| _web_ | `web/` | _pnpm · Next.js_ | _UI + API routes_ | [web](modules/web.md) |
+| _worker_ | `worker/` | _uv · Celery_ | _background jobs_ | [worker](modules/worker.md) |
+
+For a hybrid repo, also document the **seam** between components (how they talk: subprocess / HTTP /
+shared queue / shared files/DB) — see [architecture](architecture.md).
+-->
+
 
 ## Map
 

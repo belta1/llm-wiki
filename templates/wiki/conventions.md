@@ -13,11 +13,19 @@ ones. Derive these from the actual code, not from generic best practice.
 
 - _File / module / test naming conventions._
 - _Where new code of each kind goes (e.g. "endpoints in `src/routes/`, one file per resource")._
+- _Project layout: e.g. TS `src/` + build to `dist/`; Python `src/`-layout vs flat `<pkg>/`._
+
+## Tooling & config locations
+
+- **Package manager:** _<e.g. pnpm — `pnpm add`; or uv — `uv add`, `uv run <tool>`>_
+- **Lint / format:** _<config file, e.g. `eslint.config.js` + `.prettierrc`; or `[tool.ruff]` in `pyproject.toml`>_
+- **Types:** _<e.g. TS `tsconfig.json`, `strict: true`; or mypy `[tool.mypy]` — annotate new code>_
 
 ## Patterns to reuse
 
 - _<Pattern>_ — _where it's defined (`<path>`) and when to use it._
 - _Shared utilities/helpers agents should prefer over rolling their own (`<path>`)._
+- _Config/DB access singletons to reuse (e.g. typed config module, DB session/client)._
 
 ## Error handling
 

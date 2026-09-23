@@ -21,7 +21,12 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init`.
    index row.
 5. **Index accuracy** — index rows pointing at moved/deleted/renamed files.
 6. **Convention drift** — `conventions.md` claims that the current code no longer follows.
-7. **Structure** — pages missing frontmatter or exceeding the size budgets in
+7. **Stale recipe commands** — recipe/Stack commands that no longer match the detected tooling: the
+   package manager or lockfile changed (e.g. `package-lock.json` → `pnpm-lock.yaml`, `requirements.txt`
+   → `uv.lock`), a referenced `package.json` script or `pyproject.toml` tool was renamed/removed, or
+   a workspace package was added/removed. Check against
+   `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/stacks.md`.
+8. **Structure** — pages missing frontmatter or exceeding the size budgets in
    `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/page-formats.md`.
 
 ## Output

@@ -20,6 +20,34 @@ carries a small compiled map under `.llm-wiki/` that the agent reads first.
 - Bundles an always-on **skill** that makes agents read the wiki before searching and keep it current
   after edits.
 
+## Optimized for Python & Node.js
+
+`init` detects the ecosystem and records the **real, runnable** commands for it — the package manager
+is inferred from the lockfile (npm/pnpm/yarn/bun; pip/poetry/uv/pipenv), and recipes come out as e.g.
+`pnpm test` or `uv run pytest`, not guesses.
+
+It also detects the **project archetype** instead of assuming a web app. A repo may be a web service,
+a data/analytics/ETL pipeline, an orchestrated workflow (Airflow/Dagster/Prefect), an
+automation/scripting/file-processing job, a worker/queue consumer, a serverless function set, an ML
+project, notebooks, a CLI, or a library — so the module pages and recipes are shaped to what the repo
+actually is (pipeline stages and "add a data source" for ETL; "run the job / its schedule" for
+automations; routers and "add a migration" only when a web framework + ORM are present). Persistence
+is detected on its own axis, so an analytics or automation repo with no database never gets a
+migration recipe.
+
+It handles **monorepos/workspaces** (pnpm/yarn/npm workspaces, Turborepo, Nx, uv/poetry) and — because
+real automations are often polyglot — **hybrid Node + Python repos**: each is mapped by component with
+its own toolchain (a Components table in the index, a module page each), and for hybrids the **seam
+between languages** (subprocess, HTTP, shared queue/DB/files) gets documented explicitly.
+
+The detection rules live in
+[skills/llm-wiki/references/stacks.md](skills/llm-wiki/references/stacks.md), and there are fully
+worked reference wikis the generator mirrors:
+[examples/node-app/](examples/node-app/.llm-wiki/) (Express + TypeScript),
+[examples/python-webapp/](examples/python-webapp/.llm-wiki/) (FastAPI + SQLAlchemy), and
+[examples/python-analytics/](examples/python-analytics/.llm-wiki/) (pandas/polars ETL — no web, no
+ORM). Other stacks still work via generic detection.
+
 ## Why it saves tokens
 
 The index says *where* code is, so the agent reads a couple of targeted files instead of sweeping the
@@ -98,9 +126,10 @@ opencode, and a growing set of agents. Same content, pointing into the same `.ll
 
 ```
 .claude-plugin/   plugin.json + marketplace.json
-skills/llm-wiki/  SKILL.md + references (page formats, token efficiency)
+skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks)
 commands/         init, update, lint
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
+examples/         node-app/ + python-webapp/ + python-analytics/ (worked reference wikis)
 ```
 
 Pointer files are written as a delimited `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block, so

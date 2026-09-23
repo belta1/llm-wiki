@@ -19,6 +19,10 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
 2. **Decide if it's substantive.** Update the wiki for: new/removed/renamed modules or files, changed
    public interfaces, new conventions or patterns, moved responsibilities, new dependencies. Skip
    pure formatting, comments, and trivial one-liners.
+   - **Tooling changes are substantive too:** a changed lockfile / package manager, renamed or added
+     `package.json` scripts or `pyproject.toml` `[tool.*]` entries, or a new workspace package.
+     Refresh `recipes.md`, `conventions.md`, and the `index.md` Stack/Packages block so the recorded
+     commands stay runnable. See `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/stacks.md`.
 
 3. **Update the affected pages:**
    - `index.md` — fix rows whose key files/paths/purpose changed; add rows for new areas.

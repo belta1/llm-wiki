@@ -56,6 +56,12 @@ Update the wiki in the same session:
   [references/page-formats.md](references/page-formats.md).
 - Why and how the wiki saves tokens, plus page-size budgets: see
   [references/token-efficiency.md](references/token-efficiency.md).
+- Detecting the stack and writing stack-correct recipes/pages: see
+  [references/stacks.md](references/stacks.md). It covers Python & Node package managers and tooling,
+  and — importantly — how to identify the **project archetype** (web service, data/ETL, orchestration,
+  automation/jobs, file-processing, worker, serverless, ML, notebooks, CLI, library) and handle
+  **hybrid Node+Python** repos. Don't assume a web app. Use it whenever you record a command so it
+  matches the repo's real tooling (`pnpm test`, `uv run pytest`, …) rather than a guess.
 
 ## Related commands
 
