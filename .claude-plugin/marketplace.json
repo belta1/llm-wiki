@@ -1,0 +1,17 @@
+{
+  "name": "llm-wiki-marketplace",
+  "owner": {
+    "name": "Jose"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace hosting the llm-wiki plugin.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "llm-wiki",
+      "source": "./",
+      "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) for AI coding agents."
+    }
+  ]
+}
