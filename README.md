@@ -44,9 +44,11 @@ The detection rules live in
 [skills/llm-wiki/references/stacks.md](skills/llm-wiki/references/stacks.md), and there are fully
 worked reference wikis the generator mirrors:
 [examples/node-app/](examples/node-app/.llm-wiki/) (Express + TypeScript),
-[examples/python-webapp/](examples/python-webapp/.llm-wiki/) (FastAPI + SQLAlchemy), and
+[examples/python-webapp/](examples/python-webapp/.llm-wiki/) (FastAPI + SQLAlchemy),
 [examples/python-analytics/](examples/python-analytics/.llm-wiki/) (pandas/polars ETL — no web, no
-ORM). Other stacks still work via generic detection.
+ORM), and [examples/hybrid-app/](examples/hybrid-app/.llm-wiki/) (Node web + Python worker over Redis,
+with a `seam` page documenting the cross-language contract). Other stacks still work via generic
+detection.
 
 ## Why it saves tokens
 
@@ -129,7 +131,7 @@ opencode, and a growing set of agents. Same content, pointing into the same `.ll
 skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks)
 commands/         init, update, lint
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
-examples/         node-app/ + python-webapp/ + python-analytics/ (worked reference wikis)
+examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/ (worked reference wikis)
 ```
 
 Pointer files are written as a delimited `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block, so

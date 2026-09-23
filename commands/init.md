@@ -23,6 +23,8 @@ example for page shape and brevity:
 - `${CLAUDE_PLUGIN_ROOT}/examples/node-app/.llm-wiki/` — Express + TypeScript
 - `${CLAUDE_PLUGIN_ROOT}/examples/python-webapp/.llm-wiki/` — FastAPI + SQLAlchemy web service
 - `${CLAUDE_PLUGIN_ROOT}/examples/python-analytics/.llm-wiki/` — pandas/polars ETL, no web, no ORM
+- `${CLAUDE_PLUGIN_ROOT}/examples/hybrid-app/.llm-wiki/` — hybrid Node web + Python worker over Redis
+  (Components table + a `seam` module page for the cross-language contract)
 
 (Other stacks/archetypes still work; fall back to generic detection.)
 

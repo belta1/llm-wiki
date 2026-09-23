@@ -171,6 +171,7 @@ this with the hybrid guidance above.
 - **`modules/*`:** one per natural unit for the archetype (see Step 3) or per package/component.
 
 Mirror the bundled worked example closest to the repo's archetype for shape and brevity:
-`examples/node-app/` (Express + TS web service), `examples/python-webapp/` (FastAPI + SQLAlchemy), and
-`examples/python-analytics/` (pandas/polars ETL — no web, no ORM). The same page shapes extend to
-orchestration, automation, worker, and hybrid repos.
+`examples/node-app/` (Express + TS web service), `examples/python-webapp/` (FastAPI + SQLAlchemy),
+`examples/python-analytics/` (pandas/polars ETL — no web, no ORM), and `examples/hybrid-app/` (Node
+web + Python worker over Redis — Components table + a `seam` module page for the cross-language
+contract). The same page shapes extend to orchestration, automation, and worker repos.
