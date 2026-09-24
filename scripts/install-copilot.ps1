@@ -82,6 +82,15 @@ if ($Scaffold) {
 # 2) Install the Copilot pointer (always).
 Install-Block (Join-Path $Templates "pointers\copilot-instructions.md") (Join-Path $Target ".github\copilot-instructions.md")
 
+# 2b) Install Copilot prompt files — the /llm-wiki-init|update|lint commands for VS Code Copilot Chat.
+$promptsSrc = Join-Path $Templates "copilot-prompts"
+if (Test-Path $promptsSrc) {
+  $promptsDest = Join-Path $Target ".github\prompts"
+  if (-not (Test-Path $promptsDest)) { New-Item -ItemType Directory -Force -Path $promptsDest | Out-Null }
+  Copy-Item -Force -Path (Join-Path $promptsSrc "*.prompt.md") -Destination $promptsDest
+  Write-Host "  created  $promptsDest\*.prompt.md  (Copilot: /llm-wiki-init, /llm-wiki-update, /llm-wiki-lint)"
+}
+
 # 3) Optionally install the other tools' pointers too.
 if ($AllPointers) {
   Install-Block (Join-Path $Templates "pointers\CLAUDE.md") (Join-Path $Target "CLAUDE.md")
@@ -100,3 +109,7 @@ Write-Host "Done. Next steps for GitHub Copilot:"
 Write-Host "  - Commit .github\copilot-instructions.md (Copilot reads committed repo files)."
 Write-Host "  - In VS Code, ensure setting 'github.copilot.chat.codeGeneration.useInstructionFiles' is on"
 Write-Host "    (default in current versions). github.com/mobile Copilot picks it up automatically."
+Write-Host "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) and run '/llm-wiki-init'"
+Write-Host "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
+Write-Host "    /llm-wiki-lint. No VS Code? Paste .github\prompts\llm-wiki-init.prompt.md into any"
+Write-Host "    Copilot agent chat."

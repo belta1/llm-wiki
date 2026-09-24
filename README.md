@@ -133,6 +133,28 @@ To confirm it's active:
 You can verify Copilot is using it by asking Copilot Chat a question about the repo; recent Copilot
 UIs show `copilot-instructions.md` as a referenced file in the response.
 
+#### Populating (and maintaining) the wiki with Copilot
+
+The pointer only pays off once `.llm-wiki/` is filled in. Copilot has no `/llm-wiki:init` plugin
+command, but VS Code supports **prompt files** — reusable prompts that show up as `/`-commands in
+Copilot Chat. The installer drops three into `.github/prompts/`:
+
+| Prompt | Copilot Chat command | Does |
+|--------|----------------------|------|
+| `llm-wiki-init.prompt.md` | `/llm-wiki-init` | scans the repo and fills in / creates the wiki pages |
+| `llm-wiki-update.prompt.md` | `/llm-wiki-update` | refreshes affected pages after code changes |
+| `llm-wiki-lint.prompt.md` | `/llm-wiki-lint` | health-checks the wiki for drift and broken links |
+
+To populate: open **Copilot Chat in Agent mode** (so it can read files and make edits) and run
+**`/llm-wiki-init`**. If the command doesn't appear, enable the **`chat.promptFiles`** setting in VS
+Code. Re-run `/llm-wiki-update` as the code evolves, and `/llm-wiki-lint` periodically. These prompts
+are self-contained (they carry the same archetype-detection guidance as the Claude command), so they
+work without the plugin installed.
+
+**No VS Code prompt-file support?** Just paste the contents of
+`.github/prompts/llm-wiki-init.prompt.md` into any Copilot agent chat (or the Copilot coding agent on
+github.com) — it's a plain prompt.
+
 > Optional: GitHub also supports path-scoped instructions under `.github/instructions/*.instructions.md`
 > with an `applyTo:` glob. The plugin generates the single repo-wide file by default; you can add
 > path-scoped ones by hand if you want area-specific guidance.
