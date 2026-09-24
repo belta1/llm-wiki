@@ -102,6 +102,24 @@ told to read `.llm-wiki/index.md` first. Nothing else to enable.
 standard "repository custom instructions" file — Copilot automatically prepends it to its context for
 that repo. There's no package to install; the file just has to exist and be committed.
 
+**Don't use Claude Code?** Install the Copilot integration directly with the bundled script — it drops
+in `.github/copilot-instructions.md` (merging into any existing one via a managed block) and can
+scaffold the wiki:
+
+```bash
+# macOS / Linux / Git Bash
+scripts/install-copilot.sh /path/to/your/repo --scaffold
+
+# Windows PowerShell
+scripts\install-copilot.ps1 C:\path\to\your\repo -Scaffold
+```
+
+Both are idempotent (re-running replaces the managed block, never duplicating it or clobbering your
+own content) and take `--scaffold`/`-Scaffold` to also copy starter `.llm-wiki/` pages, and
+`--all-pointers`/`-AllPointers` to install the `CLAUDE.md` and `AGENTS.md` pointers too. The pointer
+is most useful once `.llm-wiki/` is actually filled in (by hand, or via `/llm-wiki:init` in Claude
+Code).
+
 To confirm it's active:
 
 - **VS Code / Visual Studio / JetBrains (Copilot Chat & code generation):** repository instruction
@@ -132,6 +150,7 @@ skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks)
 commands/         init, update, lint
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
 examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/ (worked reference wikis)
+scripts/          install-copilot.sh / .ps1 (install the Copilot integration without Claude Code)
 ```
 
 Pointer files are written as a delimited `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block, so
