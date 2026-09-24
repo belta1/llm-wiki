@@ -1,5 +1,4 @@
 ---
-mode: agent
 description: Populate or refresh this repo's .llm-wiki/ knowledge base so Copilot orients fast and uses fewer tokens.
 ---
 

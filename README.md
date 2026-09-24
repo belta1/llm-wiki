@@ -145,8 +145,11 @@ Copilot Chat. The installer drops three into `.github/prompts/`:
 | `llm-wiki-update.prompt.md` | `/llm-wiki-update` | refreshes affected pages after code changes |
 | `llm-wiki-lint.prompt.md` | `/llm-wiki-lint` | health-checks the wiki for drift and broken links |
 
-To populate: open **Copilot Chat in Agent mode** (so it can read files and make edits) and run
-**`/llm-wiki-init`**. If the command doesn't appear, enable the **`chat.promptFiles`** setting in VS
+To populate: run **`/llm-wiki-init`** in Copilot Chat. The prompts carry no `agent:` in their
+frontmatter, so they run in whichever mode you have selected — **ask**, **plan**, **agent**, or a
+custom agent. Since `init`/`update`/`lint` need to read files and write the wiki, pick an
+edit-capable mode (**agent**) when you want the changes applied; **ask**/**plan** work for a
+read-only preview. If the command doesn't appear, enable the **`chat.promptFiles`** setting in VS
 Code. Re-run `/llm-wiki-update` as the code evolves, and `/llm-wiki-lint` periodically. These prompts
 are self-contained (they carry the same archetype-detection guidance as the Claude command), so they
 work without the plugin installed.
@@ -154,6 +157,10 @@ work without the plugin installed.
 **No VS Code prompt-file support?** Just paste the contents of
 `.github/prompts/llm-wiki-init.prompt.md` into any Copilot agent chat (or the Copilot coding agent on
 github.com) — it's a plain prompt.
+
+> Heads-up: VS Code is migrating prompt files to **agent skills**. Prompt files still work with the
+> Local agent but are deprecated for newer Agent Host sessions, which auto-migrate them to skills. The
+> content here is portable — if your VS Code converts these to skills, they keep working unchanged.
 
 > Optional: GitHub also supports path-scoped instructions under `.github/instructions/*.instructions.md`
 > with an `applyTo:` glob. The plugin generates the single repo-wide file by default; you can add

@@ -1,5 +1,4 @@
 ---
-mode: agent
 description: Refresh this repo's .llm-wiki/ after code changes — update affected pages, add pages for new subsystems, fix cross-links, append a log entry.
 ---
 

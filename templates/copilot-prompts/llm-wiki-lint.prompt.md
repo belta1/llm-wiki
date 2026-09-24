@@ -1,5 +1,4 @@
 ---
-mode: agent
 description: Health-check this repo's .llm-wiki/ — find stale claims, orphan pages, missing module pages, broken links, and drift from the code.
 ---
 
