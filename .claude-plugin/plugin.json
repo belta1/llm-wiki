@@ -1,0 +1,17 @@
+{
+  "name": "llm-wiki",
+  "version": "0.1.0",
+  "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) so AI coding agents orient fast and use fewer tokens. Ships an always-on maintainer skill plus /llm-wiki:init, :update, and :lint commands. Generates pointer files for Claude, Codex/AGENTS.md, and GitHub Copilot.",
+  "author": {
+    "name": "Jose"
+  },
+  "keywords": [
+    "knowledge-base",
+    "codebase-map",
+    "onboarding",
+    "token-efficiency",
+    "documentation",
+    "copilot",
+    "agents"
+  ]
+}
