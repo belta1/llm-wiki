@@ -26,6 +26,22 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init`.
    → `uv.lock`), a referenced `package.json` script or `pyproject.toml` tool was renamed/removed, or
    a workspace package was added/removed. Check against
    `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/stacks.md`.
+   - **CI drift:** recipe commands that differ from what CI runs (`.github/workflows/`,
+     `azure-pipelines.yml`) — CI is the ground truth.
+   - **T-SQL drift:** recipes naming a `.sqlproj`, publish profile, SQLCMD variable, SSIS package,
+     or Agent job that no longer exists; a script repo whose run list (`deploy.sql` `:r` lines) omits
+     scripts present on disk; `ALTER TABLE` recipes in a state-based SSDT project.
+   - **PostgreSQL drift:** a `deploy.sql` `\ir` run list that omits (or names missing) scripts on
+     disk; `psql` recipes without `-v ON_ERROR_STOP=1`; recipes naming a service, variable, role or
+     `pg_cron` job that no longer exists; T-SQL syntax in a recipe for a Postgres repo (or vice versa).
+   - **R drift:** recipes naming targets no longer in `_targets.R`, removed Quarto files, or a
+     dependency manager the repo no longer uses (e.g. `renv::restore()` with no `renv.lock`).
+   - **Slurm drift:** recipes/job tables naming `*.sbatch` scripts, partitions, accounts or module
+     versions that no longer match the job scripts' `#SBATCH` / `module load` lines.
+7b. **Stale database objects** — `schema.object` names cited in pages (contract tables, Database
+   objects tables, glossary) that no longer exist in the source (`CREATE … <schema>.<name>`, incl.
+   `CREATE OR REPLACE FUNCTION`), or whose parameters/result columns/error numbers/`ERRCODE`s
+   changed.
 8. **Structure** — pages missing frontmatter or exceeding the size budgets in
    `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/page-formats.md`.
 

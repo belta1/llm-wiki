@@ -13,8 +13,17 @@ the `llm-wiki-init` prompt instead.)
    added, removed, renamed, or interface-changed files and modules.
 2. **Decide if it's substantive** — update the wiki for: new/removed/renamed modules or files, changed
    public interfaces, new conventions/patterns, moved responsibilities, new dependencies, or **tooling
-   changes** (a changed lockfile/package manager, renamed scripts, a new workspace package — refresh
-   `recipes.md`, `conventions.md`, and the `index.md` Stack block). Skip formatting/comment-only edits.
+   changes** (a changed lockfile/package manager/runtime version, renamed scripts, changed CI steps,
+   a new workspace package — refresh `recipes.md`, `conventions.md`, and the `index.md` Stack block).
+   In **T-SQL** repos also: added/removed/renamed schemas, tables, views or procs; changed proc
+   parameters, result sets or `THROW` numbers (update the contract page); a changed `.sqlproj`,
+   publish profile or SQLCMD variable; a new SSIS package, SQL Agent job, or script in the deploy run
+   order. Renames in a `.sqlproj` must also be in the `.refactorlog` — flag it if not. In
+   **PostgreSQL** repos: changed functions/views (arguments, return shape, `ERRCODE`s, grants/RLS),
+   scripts added to or missing from the `\ir` run list, new one-shot changes, extensions or `pg_cron`
+   jobs. In **R** repos: `renv.lock` / `DESCRIPTION` dependency changes, new targets, reports or Shiny
+   modules. With **Slurm**: new/removed job scripts, changed `#SBATCH` resources or `module load`
+   versions, a changed dependency chain. Skip formatting/comment-only edits.
 3. **Update the affected pages** — `index.md` rows, the relevant `modules/<name>.md` (add a new one for
    any significant new subsystem), and `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md`
    where the change touched them. Bump each edited page's `updated:` date.

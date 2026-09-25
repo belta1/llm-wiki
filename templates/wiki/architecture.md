@@ -11,7 +11,10 @@ much code, then use [index](index.md) to reach specifics.
 
 ## Overview
 
-_One paragraph: what kind of system this is (web app, CLI, service, library), and the big pieces._
+_One paragraph: what kind of system this is (web app, CLI, service, library, data pipeline, database
+project, data warehouse, …), and the big pieces. For a database repo, state the deploy model
+(state-based dacpac, ordered scripts, or a migration tool) and the SQL dialect. For an HPC repo,
+say what runs on the cluster and how jobs are chained._
 
 ## Components
 

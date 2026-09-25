@@ -19,10 +19,24 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
 2. **Decide if it's substantive.** Update the wiki for: new/removed/renamed modules or files, changed
    public interfaces, new conventions or patterns, moved responsibilities, new dependencies. Skip
    pure formatting, comments, and trivial one-liners.
-   - **Tooling changes are substantive too:** a changed lockfile / package manager, renamed or added
-     `package.json` scripts or `pyproject.toml` `[tool.*]` entries, or a new workspace package.
+   - **Tooling changes are substantive too:** a changed lockfile / package manager / runtime version,
+     renamed or added `package.json` scripts or `pyproject.toml` `[tool.*]` entries, changed CI
+     workflow steps, or a new workspace package. For T-SQL: a changed `.sqlproj` (SDK/target
+     platform/references), added or edited publish profiles or SQLCMD variables, new pre/post-deploy
+     includes, a new SSIS package or SQL Agent job, or a new script in the deploy run order. For
+     PostgreSQL: a new/removed script in the `\ir` run list, a changed `psql` driver or variables, a
+     new extension or role, a new one-shot change, or a new `pg_cron` job. For R: `renv.lock` /
+     `DESCRIPTION` dependency changes, new targets in `_targets.R`, a new Quarto report or Shiny
+     module. For Slurm: a new or removed job script, changed `#SBATCH` resources/partition/account,
+     new `module load` versions, or a changed dependency chain in the submit script.
      Refresh `recipes.md`, `conventions.md`, and the `index.md` Stack/Packages block so the recorded
      commands stay runnable. See `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/stacks.md`.
+   - **Database changes are substantive** when they add/remove/rename a schema, table, view or proc,
+     change a proc's parameters, result set or `THROW` numbers (update the contract page), change a
+     warehouse grain/SCD type, or move a load step. Renames in an SSDT project must also appear in
+     the `.refactorlog` — if one doesn't, flag it to the user. For PostgreSQL the same applies to
+     functions and views (arguments, `RETURNS` shape, `ERRCODE`s raised, grants/RLS); a new
+     re-runnable script that isn't idempotent, or one missing from the run list, should be flagged.
 
 3. **Update the affected pages:**
    - `index.md` — fix rows whose key files/paths/purpose changed; add rows for new areas.

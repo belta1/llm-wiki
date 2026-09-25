@@ -13,6 +13,25 @@ _One-sentence purpose: what this subsystem is responsible for._
 - `<path>` — _what it is / the entry point._
 - `<path>` — _..._
 
+<!-- Optional, for database-shaped modules (a schema, warehouse layer, SSIS package group).
+     Delete if not applicable.
+## Database objects
+
+| Object | Kind / grain | Notes |
+|--------|--------------|-------|
+| `<schema>.<Table>` | table | _keys, soft-delete, SCD type, …_ |
+| `<schema>.usp_<Name>` | proc | _who calls it; error numbers it THROWs_ |
+| `<schema>.<fn_name>(args)` | function (Postgres) | _returns; ERRCODEs it RAISEs; volatility_ |
+-->
+
+<!-- Optional, for Slurm job groups. Delete if not applicable.
+## Jobs
+
+| Script | Resources | Array | Depends on | Reads → writes |
+|--------|-----------|-------|------------|----------------|
+| `slurm/<job>.sbatch` | _partition, time, mem, cpus/gpus_ | _`0-99%20` → row of params.csv_ | _`afterok:<job>`_ | _`$SCRATCH/in/` → `results/<job>/`_ |
+-->
+
 ## How it works
 
 _Short description of the flow within this module and how it connects to the rest of the system.
