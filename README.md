@@ -20,25 +20,98 @@ carries a small compiled map under `.llm-wiki/` that the agent reads first.
 - Bundles an always-on **skill** that makes agents read the wiki before searching and keep it current
   after edits.
 
-## Optimized for Python & Node.js
+## Optimized for Python, Node.js, T-SQL, PostgreSQL & R (plus Slurm)
 
 `init` detects the ecosystem and records the **real, runnable** commands for it — the package manager
-is inferred from the lockfile (npm/pnpm/yarn/bun; pip/poetry/uv/pipenv), and recipes come out as e.g.
-`pnpm test` or `uv run pytest`, not guesses.
+is inferred from the lockfile (npm/pnpm/yarn/bun/deno; pip/poetry/uv/pdm/hatch/pixi/pipenv), the
+runtime version from `.nvmrc`/`.python-version`, the single-test syntax from the actual test runner
+(Vitest, Jest, `node --test`, pytest, …), and everything is cross-checked against **CI workflows**,
+which are treated as the ground truth. Recipes come out as e.g. `pnpm vitest run -t "<name>"` or
+`uv run pytest file::test`, not guesses.
 
 It also detects the **project archetype** instead of assuming a web app. A repo may be a web service,
 a data/analytics/ETL pipeline, an orchestrated workflow (Airflow/Dagster/Prefect), an
 automation/scripting/file-processing job, a worker/queue consumer, a serverless function set, an ML
-project, notebooks, a CLI, or a library — so the module pages and recipes are shaped to what the repo
+project, notebooks, a CLI, a library, a database repo, an R package / analysis / Shiny app, or an
+HPC pipeline submitted to Slurm — so the module pages and recipes are shaped to what the repo
 actually is (pipeline stages and "add a data source" for ETL; "run the job / its schedule" for
 automations; routers and "add a migration" only when a web framework + ORM are present). Persistence
 is detected on its own axis, so an analytics or automation repo with no database never gets a
 migration recipe.
 
 It handles **monorepos/workspaces** (pnpm/yarn/npm workspaces, Turborepo, Nx, uv/poetry) and — because
-real automations are often polyglot — **hybrid Node + Python repos**: each is mapped by component with
-its own toolchain (a Components table in the index, a module page each), and for hybrids the **seam
-between languages** (subprocess, HTTP, shared queue/DB/files) gets documented explicitly.
+real automations are often polyglot — **hybrid repos** (Node + Python, Python + R, app + database):
+each is mapped by component with its own toolchain (a Components table in the index, a module page
+each), and for hybrids the **seam between languages** (subprocess, HTTP, shared queue/DB/files, a SQL
+contract, a Slurm job chain) gets documented explicitly.
+
+### T-SQL / SQL Server
+
+Database repos are first-class, not "generic SQL":
+
+- **Database projects** — SDK-style (`Microsoft.Build.Sql`, built with `dotnet build`) and classic
+  SSDT `.sqlproj`. The wiki records the build → **preview** (`sqlpackage /Action:Script`) → publish →
+  tSQLt flow, publish profiles and SQLCMD variables, pre/post-deploy scripts, and the refactorlog —
+  and it knows a state-based project must never get an `ALTER TABLE` recipe.
+- **SQL script / DBA repos** — ordered, idempotent `sqlcmd` deployments (`deploy.sql` with `:r`),
+  SQL Agent job scripts, environment targeting.
+- **SSIS / data warehouses** — packages and SSISDB environments, `stg` → `dw` → `mart` layers,
+  watermarks, SCD handling, Agent schedules, backfills.
+- **App + database hybrids** — the stored-procedure/view contract (params, result sets, `THROW`
+  numbers) gets its own page as the seam.
+
+### PostgreSQL
+
+Focused on **`psql` script repos** — the common "folder of SQL files and a deploy script" setup:
+
+- The **run list** (`deploy.sql` of `\ir` includes, numbered folders, or a driver script) and the exact
+  `psql -X -v ON_ERROR_STOP=1 [-1] -f …` call — the wiki never records a `psql` recipe without
+  `ON_ERROR_STOP`.
+- **Re-runnable vs one-shot scripts**: idempotency idioms (`IF NOT EXISTS`, `CREATE OR REPLACE`,
+  `ON CONFLICT`) for object scripts, and how one-shot data changes are tracked.
+- Connections via `PGSERVICE` / `pg_service.conf` (never a password), roles/grants/RLS, extensions,
+  online-DDL rules (`CONCURRENTLY`, `NOT VALID`), pgTAP via `pg_prove`, `pg_cron` jobs,
+  `sqlfluff --dialect postgres` / `squawk`.
+- **App + Postgres**: the SQL-function/view contract (signatures, return shapes, `ERRCODE`s) as the
+  seam page. Migration tools (Sqitch, Flyway, dbmate, …) are detected and their commands recorded.
+
+T-SQL and PostgreSQL are told apart by **dialect markers** (`GO`/`SET NOCOUNT`/`NVARCHAR` vs
+`$$`/`plpgsql`/`\ir`/`JSONB`), not by the `.sql` extension, so each gets the right rules.
+
+### R
+
+- **renv** restore/snapshot and the R version; **packages** (`DESCRIPTION`, roxygen →
+  `devtools::document()/test()/check()`, never hand-edited `NAMESPACE`); **targets** pipelines
+  (`tar_make()`, rerun one target, never touch `_targets/`); **Quarto / R Markdown** reports;
+  **Shiny** apps; testthat single-file runs; lintr/styler.
+
+### Slurm / HPC
+
+An execution layer on top of any language, detected from `#SBATCH` scripts (or Snakemake/Nextflow/
+targets Slurm backends):
+
+- Per-job **resources** (partition/account/time/mem/cpus/gpus), **arrays** and how
+  `$SLURM_ARRAY_TASK_ID` maps to inputs, the **`afterok` dependency chain**, `module load` versions,
+  scratch vs project storage, log paths.
+- Recipes to submit, **test small first** (`--test-only`, tiny arrays, debug partition), inspect with
+  `sacct`/`seff`, rerun only failed array tasks, and debug one task under `salloc` — never computing
+  on the login node. The jobs page is treated as the seam between pipeline stages.
+
+### Path-scoped Copilot instructions
+
+For Copilot users, the installer also adds `.github/instructions/<stack>.instructions.md` for each
+stack it finds, so Copilot follows the right rules while editing those files:
+
+| File | `applyTo` | Installed when the repo has |
+|------|-----------|-----------------------------|
+| `tsql.instructions.md` | `**/*.sql` | `*.sqlproj` / `*.dtsx`, or `*.sql` with T-SQL syntax |
+| `postgres.instructions.md` | `**/*.sql` | `*.sql` with PostgreSQL syntax, `.psqlrc`, `sqitch.plan` |
+| `r.instructions.md` | `**/*.{R,r,Rmd,rmd,qmd}` | `*.R` / `*.Rmd`, `renv.lock`, `*.Rproj`, `_targets.R`, an R package `DESCRIPTION` |
+| `slurm.instructions.md` | `**/*.{sbatch,slurm}` | `*.sbatch` / `*.slurm`, or shell scripts containing `#SBATCH` |
+
+In a repo with both SQL dialects both SQL files are installed; each tells Copilot to defer to the
+dialect the wiki's index records for that folder. If your `#SBATCH` scripts are plain `*.sh`, widen
+`applyTo` in `slurm.instructions.md` to their paths (`/llm-wiki:init` does this for you).
 
 The detection rules live in
 [skills/llm-wiki/references/stacks.md](skills/llm-wiki/references/stacks.md), and there are fully
@@ -46,9 +119,17 @@ worked reference wikis the generator mirrors:
 [examples/node-app/](examples/node-app/.llm-wiki/) (Express + TypeScript),
 [examples/python-webapp/](examples/python-webapp/.llm-wiki/) (FastAPI + SQLAlchemy),
 [examples/python-analytics/](examples/python-analytics/.llm-wiki/) (pandas/polars ETL — no web, no
-ORM), and [examples/hybrid-app/](examples/hybrid-app/.llm-wiki/) (Node web + Python worker over Redis,
-with a `seam` page documenting the cross-language contract). Other stacks still work via generic
-detection.
+ORM), [examples/hybrid-app/](examples/hybrid-app/.llm-wiki/) (Node web + Python worker over Redis,
+with a `seam` page documenting the cross-language contract),
+[examples/tsql-database/](examples/tsql-database/.llm-wiki/) (SDK-style `.sqlproj` + sqlpackage +
+tSQLt, with an `api-contract` page for the procs an app calls), and
+[examples/tsql-warehouse/](examples/tsql-warehouse/.llm-wiki/) (SSIS + ordered sqlcmd scripts + SQL
+Agent jobs), [examples/postgres-database/](examples/postgres-database/.llm-wiki/) (psql script repo
++ one-shot changes + pgTAP + `pg_cron`, with an `api-contract` page for the SQL functions a service
+calls), [examples/r-analysis/](examples/r-analysis/.llm-wiki/) (renv + targets + Quarto +
+testthat), and [examples/hpc-slurm/](examples/hpc-slurm/.llm-wiki/) (Python preprocessing + R
+models run as chained Slurm array jobs, with a `jobs` page as the seam). Other stacks still work via
+generic detection.
 
 ## Why it saves tokens
 
@@ -61,11 +142,12 @@ See [skills/llm-wiki/references/token-efficiency.md](skills/llm-wiki/references/
 This repo doubles as a single-plugin marketplace:
 
 ```
-/plugin marketplace add M:\00_repo\llm-wiki
+/plugin marketplace add <local-path-or-git-url-of-this-repo>
 /plugin install llm-wiki
 ```
 
-(Once pushed to GitHub, use the repo URL in place of the local path.)
+e.g. `/plugin marketplace add E:\code\llm-wiki` for a local clone, or the repo's Git URL once it's
+pushed.
 
 ## Usage
 
@@ -115,10 +197,21 @@ scripts\install-copilot.ps1 C:\path\to\your\repo -Scaffold
 ```
 
 Both are idempotent (re-running replaces the managed block, never duplicating it or clobbering your
-own content) and take `--scaffold`/`-Scaffold` to also copy starter `.llm-wiki/` pages, and
-`--all-pointers`/`-AllPointers` to install the `CLAUDE.md` and `AGENTS.md` pointers too. The pointer
-is most useful once `.llm-wiki/` is actually filled in (by hand, or via `/llm-wiki:init` in Claude
-Code).
+own content, and reports `created` / `updated` / `ok` per file). Options:
+
+| bash | PowerShell | Does |
+|------|------------|------|
+| `--scaffold` | `-Scaffold` | also copy starter `.llm-wiki/` pages (if none exist) |
+| `--all-pointers` | `-AllPointers` | also install the `CLAUDE.md` and `AGENTS.md` pointers |
+| `--tsql` | `-Tsql` | install `tsql.instructions.md` even if T-SQL isn't detected |
+| `--postgres` | `-Postgres` | install `postgres.instructions.md` even if PostgreSQL isn't detected |
+| `--r` | `-R` | install `r.instructions.md` even if R isn't detected |
+| `--slurm` | `-Slurm` | install `slurm.instructions.md` even if no Slurm scripts are detected |
+| `--no-path-instructions` | `-NoPathInstructions` | never install path-scoped instructions |
+
+The PowerShell script works on Windows PowerShell 5.1 and writes UTF-8 **without** a BOM, so it
+won't prepend one to your existing `CLAUDE.md`/`AGENTS.md`. The pointer is most useful once
+`.llm-wiki/` is actually filled in (by hand, or via `/llm-wiki:init` in Claude Code).
 
 To confirm it's active:
 
@@ -162,9 +255,12 @@ github.com) — it's a plain prompt.
 > Local agent but are deprecated for newer Agent Host sessions, which auto-migrate them to skills. The
 > content here is portable — if your VS Code converts these to skills, they keep working unchanged.
 
-> Optional: GitHub also supports path-scoped instructions under `.github/instructions/*.instructions.md`
-> with an `applyTo:` glob. The plugin generates the single repo-wide file by default; you can add
-> path-scoped ones by hand if you want area-specific guidance.
+> **Path-scoped instructions:** GitHub also supports `.github/instructions/*.instructions.md` files
+> with an `applyTo:` glob. The plugin ships four — `tsql`, `postgres`, `r`, `slurm` (see
+> [Path-scoped Copilot instructions](#path-scoped-copilot-instructions)) — installed automatically for
+> the stacks detected (by the scripts and by `/llm-wiki:init`). They're plugin-owned and replaced on
+> re-install; add your own path-scoped files alongside it for other
+> areas.
 
 ### Codex / other agents
 
@@ -178,7 +274,10 @@ opencode, and a growing set of agents. Same content, pointing into the same `.ll
 skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks)
 commands/         init, update, lint
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
-examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/ (worked reference wikis)
+                  + copilot-prompts/ (/llm-wiki-* prompt files) + copilot-instructions/ (path-scoped: T-SQL, PostgreSQL, R, Slurm)
+examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/
+                  + tsql-database/ + tsql-warehouse/ + postgres-database/ + r-analysis/
+                  + hpc-slurm/ (worked reference wikis)
 scripts/          install-copilot.sh / .ps1 (install the Copilot integration without Claude Code)
 ```
 

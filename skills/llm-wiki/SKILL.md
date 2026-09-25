@@ -1,6 +1,6 @@
 ---
 name: llm-wiki
-description: Use when working in a repository that contains a `.llm-wiki/` directory (a compiled codebase knowledge base). Read `.llm-wiki/index.md` before broad code searches to find where things live cheaply, and after making substantive code changes, update the affected wiki pages and append a `log.md` entry. Keeps the wiki current so future sessions start warm and use fewer tokens.
+description: Use when working in a repository that contains a `.llm-wiki/` directory (a compiled codebase knowledge base) — Python, Node.js, T-SQL/SQL Server (sqlproj, SQL scripts, SSIS), PostgreSQL (psql scripts), R (packages, targets, Shiny, Quarto), Slurm/HPC batch jobs, or mixed. Read `.llm-wiki/index.md` before broad code searches to find where things live cheaply, and after making substantive code or schema changes, update the affected wiki pages and append a `log.md` entry. Keeps the wiki current so future sessions start warm and use fewer tokens.
 ---
 
 # LLM Wiki maintainer
@@ -28,8 +28,13 @@ the code, the code wins — and you fix the wiki (see below).
 ## After you make substantive code changes
 
 Substantive = new/removed/renamed modules or files, changed public interfaces, new conventions or
-patterns, moved responsibilities, new dependencies, or anything that makes an existing wiki page
-wrong or incomplete. (Skip pure formatting, comments, or trivial one-liners.)
+patterns, moved responsibilities, new dependencies, changed build/test/deploy commands, or anything
+that makes an existing wiki page wrong or incomplete. In database repos that includes added/removed/
+renamed schemas, tables, views or procs, changed proc parameters/result sets/error numbers, new SSIS
+packages or Agent jobs, new scripts in the deploy run order, and changed Postgres function signatures
+/ `ERRCODE`s / grants. In R repos: dependency changes (`renv.lock`, `DESCRIPTION`) and new targets;
+with Slurm: new job scripts, changed `#SBATCH` resources, or a changed job chain. (Skip pure
+formatting, comments, or trivial one-liners.)
 
 Update the wiki in the same session:
 
@@ -58,10 +63,29 @@ Update the wiki in the same session:
   [references/token-efficiency.md](references/token-efficiency.md).
 - Detecting the stack and writing stack-correct recipes/pages: see
   [references/stacks.md](references/stacks.md). It covers Python & Node package managers and tooling,
-  and — importantly — how to identify the **project archetype** (web service, data/ETL, orchestration,
-  automation/jobs, file-processing, worker, serverless, ML, notebooks, CLI, library) and handle
-  **hybrid Node+Python** repos. Don't assume a web app. Use it whenever you record a command so it
-  matches the repo's real tooling (`pnpm test`, `uv run pytest`, …) rather than a guess.
+  the **T-SQL** toolchains (SDK-style/classic `.sqlproj` + sqlpackage, sqlcmd script repos, SSIS +
+  SQL Agent, tSQLt), **PostgreSQL** `psql` script repos (run lists, `ON_ERROR_STOP`, pgTAP),
+  **R** (renv, devtools, targets, Quarto, Shiny, testthat), **Slurm** batch jobs, and — importantly — how to identify the **project archetype** (web service,
+  data/ETL, orchestration, automation/jobs, file-processing, worker, serverless, ML, notebooks, CLI,
+  library, database project, script repo, warehouse, R package/analysis/Shiny, HPC pipeline) and
+  handle **hybrid** repos (Node+Python, Python+R, app + database, anything + Slurm). Don't assume a web app. Use it whenever you record a command so it matches the
+  repo's real tooling (`pnpm test`, `uv run pytest`, `dotnet build Db.sqlproj`,
+  `psql -X -v ON_ERROR_STOP=1 -f db/deploy.sql`, `Rscript -e 'targets::tar_make()'`, …) rather than a
+  guess — and prefer what CI runs when sources disagree.
+- **T-SQL editing rules** worth remembering: in a state-based `.sqlproj`, edit the `CREATE`
+  statement (the dacpac diff writes the `ALTER`), rename through the refactorlog, and put data changes
+  in pre/post-deploy scripts; in script repos, keep every script idempotent and add it to the run
+  list.
+- **PostgreSQL editing rules:** re-runnable scripts must be idempotent (`IF NOT EXISTS`,
+  `CREATE OR REPLACE`, `ON CONFLICT`) and registered in the `\ir` run list; destructive changes go
+  in the repo's one-shot mechanism; every `psql` call gets `-v ON_ERROR_STOP=1`; big-table DDL uses
+  `CONCURRENTLY` / `NOT VALID`. Don't carry T-SQL habits into Postgres files or vice versa.
+- **R rules:** after adding a package run `renv::snapshot()` (and add it to `DESCRIPTION` in a
+  package); regenerate `NAMESPACE`/`man/` with `devtools::document()`, never by hand; don't edit the
+  `_targets/` store.
+- **Slurm rules:** `#SBATCH` lines before any command; use only the partitions/accounts/modules the
+  wiki lists; never run heavy compute on a login node; test with a tiny array or the debug
+  partition before a full submit.
 
 ## Related commands
 

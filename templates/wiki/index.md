@@ -11,15 +11,20 @@ description of what this project is and does: _<fill in>_.
 
 ## Stack
 
-_Fill with the REAL commands for this repo (inferred from the lockfile / scripts), not guesses._
+_Fill with the REAL commands for this repo (inferred from the lockfile / project file / scripts, and
+checked against CI), not guesses. Delete lines that don't apply._
 
-- **Language / runtime:** _<e.g. TypeScript, Node 20 — or Python 3.12>_
-- **Package manager:** _<e.g. pnpm (`pnpm-lock.yaml`) — or uv (`uv.lock`)>_
-- **Run locally:** _<e.g. `pnpm dev` — or `uv run uvicorn app.main:app --reload`>_
-- **Build:** _<e.g. `pnpm build` — or n/a>_
-- **Test:** _<e.g. `pnpm test` — or `uv run pytest`>_ · single: _<e.g. `pnpm test -- <file>`>_
-- **Lint / format:** _<e.g. `pnpm lint` / `pnpm format` — or `uv run ruff check` / `ruff format`>_
+- **Language / runtime:** _<e.g. TypeScript, Node 20 (`.nvmrc`) — or Python 3.12 (`.python-version`) — or T-SQL, SQL Server 2022 — or PostgreSQL 16 — or R 4.4 (`renv.lock`)>_
+- **Package manager / toolchain:** _<e.g. pnpm (`pnpm-lock.yaml`) — or uv (`uv.lock`) — or .NET SDK + sqlpackage (SDK-style `.sqlproj`) — or psql (script run list) — or renv + targets>_
+- **Run locally:** _<e.g. `pnpm dev` — or `uv run uvicorn app.main:app --reload` — or `docker compose up -d sql` — or `Rscript -e 'targets::tar_make()'`>_
+- **Build:** _<e.g. `pnpm build` — or n/a — or `dotnet build db/Db.sqlproj` → `.dacpac`>_
+- **Deploy / publish:** _<DB repos: `sqlpackage /Action:Script …` (preview) and `/Action:Publish /Profile:…`, or `sqlcmd -i deploy.sql`, or `psql -X -v ON_ERROR_STOP=1 -f db/deploy.sql`>_
+- **Submit (Slurm):** _<e.g. `bash slurm/submit.sh` — or `sbatch slurm/<job>.sbatch`; watch `squeue --me`, inspect `sacct -j <id>`>_
+- **Cluster:** _<Slurm repos: cluster name, partition / account, `module load` versions, scratch path>_
+- **Test:** _<e.g. `pnpm test` — or `uv run pytest` — or `EXEC tSQLt.RunAll` — or `pg_prove -d <db> db/tests/` — or `Rscript -e 'devtools::test()'`>_ · single: _<e.g. `pnpm vitest run <file>`>_
+- **Lint / format:** _<e.g. `pnpm lint` / `pnpm format` — or `uv run ruff check` / `ruff format` — or `sqlfluff lint --dialect tsql|postgres` — or `lintr::lint_dir()` / `styler::style_dir()`>_
 - **Typecheck:** _<e.g. `pnpm typecheck` — or `uv run mypy <pkg>`>_
+- **CI (ground truth):** _<e.g. `.github/workflows/ci.yml`>_
 
 <!-- Monorepo OR hybrid (multi-language) repos: list each package/component with its OWN toolchain.
      Delete this block for single-component repos.
@@ -29,9 +34,11 @@ _Fill with the REAL commands for this repo (inferred from the lockfile / scripts
 |-----------|------|-----------|---------|-------------|
 | _web_ | `web/` | _pnpm · Next.js_ | _UI + API routes_ | [web](modules/web.md) |
 | _worker_ | `worker/` | _uv · Celery_ | _background jobs_ | [worker](modules/worker.md) |
+| _db_ | `db/` | _dotnet · SDK-style sqlproj_ (or _psql · script run list_) | _database schema + procs/functions_ | [db](modules/db.md) |
+| _jobs_ | `slurm/` | _Slurm · sbatch arrays_ | _cluster job scripts + submit chain_ | [jobs](modules/jobs.md) |
 
 For a hybrid repo, also document the **seam** between components (how they talk: subprocess / HTTP /
-shared queue / shared files/DB) — see [architecture](architecture.md).
+shared queue / shared files/DB / the stored-procedure or SQL-function contract / the Slurm job chain) — see [architecture](architecture.md).
 -->
 
 

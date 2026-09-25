@@ -32,5 +32,6 @@ an agent orient in one cheap read and then jump straight to the relevant code.
 | [`modules/`](modules/) | One page per significant subsystem |
 | [`log.md`](log.md) | Append-only record of wiki changes |
 
-Maintained with the [`llm-wiki` plugin](https://github.com/) (`/llm-wiki:init`, `:update`, `:lint`),
+Maintained with the `llm-wiki` Claude Code plugin (`/llm-wiki:init`, `:update`, `:lint`), the
+Copilot prompt files in `.github/prompts/` (`/llm-wiki-init`, `/llm-wiki-update`, `/llm-wiki-lint`),
 or by hand. Humans curate and direct; the agent does the bookkeeping.

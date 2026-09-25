@@ -6,7 +6,19 @@
   GitHub Copilot has no plugin system; it reads repository custom instructions from
   .github/copilot-instructions.md. This script installs that pointer file (merging into any
   existing one via a managed block) so Copilot is told to read the repo's .llm-wiki/ knowledge
-  base first. Optionally it also scaffolds .llm-wiki/ from the bundled templates.
+  base first, plus the /llm-wiki-* prompt files. Optionally it also scaffolds .llm-wiki/ from the
+  bundled templates.
+
+  It also installs path-scoped instructions (.github/instructions/<stack>.instructions.md) for
+  each stack it detects in the target:
+    tsql      *.sqlproj / *.dtsx, or *.sql with T-SQL syntax (GO, SET NOCOUNT, NVARCHAR, ...)
+    postgres  *.sql with PostgreSQL syntax ($$, plpgsql, \i, JSONB, ...), .psqlrc, sqitch.plan
+    r         *.R / *.Rmd, renv.lock, *.Rproj, _targets.R, an R package DESCRIPTION
+    slurm     *.sbatch / *.slurm, or shell scripts containing #SBATCH
+
+  Idempotent: re-running replaces only the managed block / plugin-owned files. Files are read and
+  written as UTF-8 without a BOM (Windows PowerShell 5.1 would otherwise misread the templates and
+  prepend a BOM to your CLAUDE.md / AGENTS.md).
 
 .PARAMETER Target
   Path to the repo to install into (default: current directory).
@@ -17,19 +29,46 @@
 .PARAMETER AllPointers
   Also install CLAUDE.md and AGENTS.md pointers (not just Copilot).
 
+.PARAMETER Tsql
+  Install the T-SQL path-scoped instructions even if not detected.
+
+.PARAMETER Postgres
+  Install the PostgreSQL path-scoped instructions even if not detected.
+
+.PARAMETER RLang
+  Install the R path-scoped instructions even if not detected. Alias: -R.
+
+.PARAMETER Slurm
+  Install the Slurm path-scoped instructions even if not detected.
+
+.PARAMETER NoPathInstructions
+  Never install path-scoped instructions (.github/instructions/*.instructions.md).
+
 .EXAMPLE
   .\scripts\install-copilot.ps1 C:\code\my-repo -Scaffold
+
+.EXAMPLE
+  .\scripts\install-copilot.ps1 C:\code\my-db -AllPointers -Tsql
+
+.EXAMPLE
+  .\scripts\install-copilot.ps1 C:\code\sim-study -R -Slurm
 #>
 param(
   [string]$Target = ".",
   [switch]$Scaffold,
-  [switch]$AllPointers
+  [switch]$AllPointers,
+  [switch]$Tsql,
+  [switch]$Postgres,
+  [Alias("R")][switch]$RLang,
+  [switch]$Slurm,
+  [switch]$NoPathInstructions
 )
 
 $ErrorActionPreference = "Stop"
 
 $PluginRoot = Split-Path -Parent $PSScriptRoot
 $Templates  = Join-Path $PluginRoot "templates"
+$Utf8NoBom  = New-Object System.Text.UTF8Encoding $false
 
 if (-not (Test-Path (Join-Path $Templates "pointers"))) {
   Write-Error "templates not found at $Templates - run this script from within the llm-wiki plugin."
@@ -39,27 +78,125 @@ $resolved = Resolve-Path -LiteralPath $Target -ErrorAction SilentlyContinue
 if (-not $resolved) { Write-Error "target repo '$Target' not found." }
 $Target = $resolved.Path
 
-# Install a managed <!-- BEGIN llm-wiki --> ... <!-- END llm-wiki --> block from a template.
-function Install-Block([string]$tpl, [string]$dest) {
-  $block = (Get-Content -Raw -LiteralPath $tpl).TrimEnd()
-  $dir = Split-Path -Parent $dest
+function Read-Utf8([string]$path) {
+  # ReadAllText strips a BOM if present and decodes as UTF-8 otherwise.
+  return [System.IO.File]::ReadAllText($path, $Utf8NoBom)
+}
+
+function Write-Utf8([string]$path, [string]$text) {
+  [System.IO.File]::WriteAllText($path, $text, $Utf8NoBom)
+}
+
+function Ensure-Dir([string]$dir) {
   if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+}
+
+# Install a managed <!-- BEGIN llm-wiki --> ... <!-- END llm-wiki --> block from a template.
+# Creates the file if absent, replaces the block if present, appends it otherwise. Keeps the
+# destination's existing line-ending style.
+function Install-Block([string]$tpl, [string]$dest) {
+  $block = (Read-Utf8 $tpl).TrimEnd() -replace "`r`n", "`n"
+  Ensure-Dir (Split-Path -Parent $dest)
 
   if (-not (Test-Path $dest)) {
-    Set-Content -LiteralPath $dest -Value $block -Encoding utf8
+    Write-Utf8 $dest ($block + "`n")
     Write-Host "  created  $dest"
-  } else {
-    $content = Get-Content -Raw -LiteralPath $dest
-    if ($content -match "<!-- BEGIN llm-wiki -->") {
-      $pattern = "(?s)<!-- BEGIN llm-wiki -->.*?<!-- END llm-wiki -->"
-      $new = [regex]::Replace($content, $pattern, { param($m) $block })
-      Set-Content -LiteralPath $dest -Value $new.TrimEnd() -Encoding utf8
-      Write-Host "  updated  $dest (managed block)"
-    } else {
-      Add-Content -LiteralPath $dest -Value ("`r`n" + $block) -Encoding utf8
-      Write-Host "  appended $dest (managed block)"
-    }
+    return
   }
+
+  $content = Read-Utf8 $dest
+  $nl = if ($content -match "`r`n") { "`r`n" } else { "`n" }
+  $block = $block -replace "`n", $nl
+
+  if ($content -match "<!-- BEGIN llm-wiki -->") {
+    $pattern = "(?s)<!-- BEGIN llm-wiki -->.*?<!-- END llm-wiki -->"
+    $new = [regex]::Replace($content, $pattern, { param($m) $block })
+    if ($new -eq $content) {
+      Write-Host "  ok       $dest (managed block already current)"
+    } else {
+      Write-Utf8 $dest $new
+      Write-Host "  updated  $dest (managed block)"
+    }
+  } else {
+    Write-Utf8 $dest ($content.TrimEnd() + $nl + $nl + $block + $nl)
+    Write-Host "  appended $dest (managed block)"
+  }
+}
+
+# Copy a plugin-owned file, reporting created / updated / unchanged.
+function Install-File([string]$src, [string]$dest) {
+  Ensure-Dir (Split-Path -Parent $dest)
+  if (-not (Test-Path $dest)) {
+    Copy-Item -LiteralPath $src -Destination $dest
+    Write-Host "  created  $dest"
+  } elseif ((Get-FileHash -LiteralPath $src).Hash -eq (Get-FileHash -LiteralPath $dest).Hash) {
+    Write-Host "  ok       $dest (unchanged)"
+  } else {
+    Copy-Item -Force -LiteralPath $src -Destination $dest
+    Write-Host "  updated  $dest"
+  }
+}
+
+# --- Stack detection (read-only; dependency/build/output dirs are skipped) ---------------------
+
+# All files under the target, listed once and reused by every detector.
+$script:SourceFiles = $null
+function Get-SourceFiles([string]$root) {
+  if ($null -eq $script:SourceFiles) {
+    $skip = '[\\/](node_modules|\.git|\.venv|venv|bin|obj|dist|build|renv|\.Rproj\.user|_targets)[\\/]'
+    $script:SourceFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File -Force -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName.Substring($root.Length) -notmatch $skip })
+  }
+  return $script:SourceFiles
+}
+
+# Files whose name matches any of the -like patterns (case-insensitive).
+function Find-Files([string]$root, [string[]]$patterns) {
+  Get-SourceFiles $root | Where-Object { $n = $_.Name; @($patterns | Where-Object { $n -like $_ }).Count -gt 0 }
+}
+
+function Test-AnyFile([string]$root, [string[]]$patterns) {
+  return [bool](Find-Files $root $patterns | Select-Object -First 1)
+}
+
+function Test-AnyFileContains([string]$root, [string[]]$patterns, [string]$regex) {
+  $hit = Find-Files $root $patterns |
+    Select-String -Pattern $regex -List -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+  return [bool]$hit
+}
+
+# *.sql alone doesn't tell T-SQL from PostgreSQL, so look for dialect markers.
+$TsqlRegex     = '^\s*GO\s*$|^:r |^:setvar |SET NOCOUNT|NVARCHAR|CREATE OR ALTER|IDENTITY\([0-9]'
+$PostgresRegex = '\$\$|plpgsql|^\\i|^\\set |JSONB|TIMESTAMPTZ|BIGSERIAL|CREATE EXTENSION|ON CONFLICT'
+
+function Test-HasTsql([string]$root) {
+  (Test-AnyFile $root @("*.sqlproj", "*.dtproj", "*.dtsx")) -or
+  (Test-AnyFileContains $root @("*.sql") $TsqlRegex)
+}
+
+function Test-HasPostgres([string]$root) {
+  (Test-AnyFile $root @(".psqlrc", "sqitch.plan", "pg_service.conf")) -or
+  (Test-AnyFileContains $root @("*.sql") $PostgresRegex)
+}
+
+function Test-HasR([string]$root) {
+  (Test-AnyFile $root @("*.R", "*.Rmd", "renv.lock", "*.Rproj", "_targets.R")) -or
+  (Test-AnyFileContains $root @("DESCRIPTION") '^Package:')
+}
+
+function Test-HasSlurm([string]$root) {
+  (Test-AnyFile $root @("*.sbatch", "*.slurm")) -or
+  (Test-AnyFileContains $root @("*.sh", "*.bash", "*.job") '^#SBATCH')
+}
+
+# Install templates\copilot-instructions\<name>.instructions.md if forced or detected.
+function Install-PathInstructions([string]$name, [bool]$forced, [scriptblock]$detect, [string]$label) {
+  if (-not $forced) {
+    if (-not (& $detect $Target)) { return }
+    Write-Host "  detected $label"
+  }
+  Install-File (Join-Path $Templates "copilot-instructions\$name.instructions.md") (Join-Path $Target ".github\instructions\$name.instructions.md")
 }
 
 Write-Host "Installing llm-wiki Copilot integration into: $Target"
@@ -82,13 +219,21 @@ if ($Scaffold) {
 # 2) Install the Copilot pointer (always).
 Install-Block (Join-Path $Templates "pointers\copilot-instructions.md") (Join-Path $Target ".github\copilot-instructions.md")
 
-# 2b) Install Copilot prompt files — the /llm-wiki-init|update|lint commands for VS Code Copilot Chat.
+# 2b) Install Copilot prompt files - the /llm-wiki-init|update|lint commands for VS Code Copilot Chat.
 $promptsSrc = Join-Path $Templates "copilot-prompts"
 if (Test-Path $promptsSrc) {
   $promptsDest = Join-Path $Target ".github\prompts"
-  if (-not (Test-Path $promptsDest)) { New-Item -ItemType Directory -Force -Path $promptsDest | Out-Null }
-  Copy-Item -Force -Path (Join-Path $promptsSrc "*.prompt.md") -Destination $promptsDest
-  Write-Host "  created  $promptsDest\*.prompt.md  (Copilot: /llm-wiki-init, /llm-wiki-update, /llm-wiki-lint)"
+  Get-ChildItem -LiteralPath $promptsSrc -Filter "*.prompt.md" | ForEach-Object {
+    Install-File $_.FullName (Join-Path $promptsDest $_.Name)
+  }
+}
+
+# 2c) Path-scoped instructions for each detected (or requested) stack.
+if (-not $NoPathInstructions) {
+  Install-PathInstructions "tsql"     $Tsql.IsPresent     { param($r) Test-HasTsql $r }     "T-SQL sources (*.sqlproj / *.dtsx / T-SQL *.sql)"
+  Install-PathInstructions "postgres" $Postgres.IsPresent { param($r) Test-HasPostgres $r } "PostgreSQL sources (psql / PL/pgSQL *.sql)"
+  Install-PathInstructions "r"        $RLang.IsPresent    { param($r) Test-HasR $r }        "R sources (*.R / *.Rmd / renv / targets)"
+  Install-PathInstructions "slurm"    $Slurm.IsPresent    { param($r) Test-HasSlurm $r }    "Slurm batch scripts (#SBATCH)"
 }
 
 # 3) Optionally install the other tools' pointers too.
@@ -106,7 +251,7 @@ if (-not (Test-Path (Join-Path $Target ".llm-wiki"))) {
 
 Write-Host ""
 Write-Host "Done. Next steps for GitHub Copilot:"
-Write-Host "  - Commit .github\copilot-instructions.md (Copilot reads committed repo files)."
+Write-Host "  - Commit .github\ (Copilot reads committed repo files)."
 Write-Host "  - In VS Code, ensure setting 'github.copilot.chat.codeGeneration.useInstructionFiles' is on"
 Write-Host "    (default in current versions). github.com/mobile Copilot picks it up automatically."
 Write-Host "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) and run '/llm-wiki-init'"
