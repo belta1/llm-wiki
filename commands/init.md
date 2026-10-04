@@ -85,6 +85,14 @@ closest worked example for page shape and brevity:
      `stacks.md` Step 3) — decides which module pages and archetype-specific recipes to write. Detect
      **persistence** separately.
    - **Hybrid / monorepo** (see step 3b).
+   - **Data sources** — scan connection code for named data sources (pyodbc / SQLAlchemy
+     `create_engine` / `DBI::dbConnect`, `Server=`/`Data Source=`/`DSN=` strings, `pg_service.conf`,
+     `tnsnames.ora`, `.env.example`). For each, **upsert** an entry (match by host/DSN name, don't
+     duplicate) into the user-global catalog `~/.claude/llm-wiki/data-sources.md` — engine, connect-via,
+     driver/DSN, auth model, and credential env-var **names** only. **Never record a secret**; flag any
+     credential inlined in code. Follow
+     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`. (This catalog is cross-project —
+     it is not part of the repo's `.llm-wiki/`.)
    - Top-level structure, entry points, routing, data layer, tests location; existing conventions by
      sampling a few representative files. Keep it efficient — sample, don't read everything.
 
@@ -148,8 +156,9 @@ closest worked example for page shape and brevity:
 
 5. **Append the first `log.md` entry**: `## [<today>] init | <one-line summary of what was created>`.
 
-6. **Report** to the user: the pages created, the modules covered, and anything you were unsure about
-   or deliberately left thin, so they can direct follow-ups.
+6. **Report** to the user: the pages created, the modules covered, any **data sources** added to or
+   matched in the cross-project catalog, and anything you were unsure about or deliberately left thin,
+   so they can direct follow-ups.
 
 ## Principles
 

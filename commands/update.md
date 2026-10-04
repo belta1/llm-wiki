@@ -37,6 +37,11 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
      the `.refactorlog` — if one doesn't, flag it to the user. For PostgreSQL the same applies to
      functions and views (arguments, `RETURNS` shape, `ERRCODE`s raised, grants/RLS); a new
      re-runnable script that isn't idempotent, or one missing from the run list, should be flagged.
+   - **Data-source changes are substantive:** a new or changed database connection (a new server/DSN,
+     a changed driver or auth model) → **upsert** the user-global catalog
+     `~/.claude/llm-wiki/data-sources.md` (match by host/DSN name; record engine / connect-via / driver
+     / auth / credential env-var **names** only; never a secret). See
+     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`.
 
 3. **Update the affected pages:**
    - `index.md` — fix rows whose key files/paths/purpose changed; add rows for new areas.
@@ -53,7 +58,8 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
 6. **Refresh pointer blocks if needed.** Only if the wiki's entry points changed; edit inside the
    `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block only, never the user's surrounding content.
 
-7. **Report** what you updated and anything you chose not to touch.
+7. **Report** what you updated, any data-source catalog entries added or changed, and anything you
+   chose not to touch.
 
 ## Principles
 

@@ -27,6 +27,11 @@ the `llm-wiki-init` prompt instead.)
 3. **Update the affected pages** — `index.md` rows, the relevant `modules/<name>.md` (add a new one for
    any significant new subsystem), and `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md`
    where the change touched them. Bump each edited page's `updated:` date.
+3b. **Data sources** — if the change added or altered a database connection (a named server/DSN,
+   driver, or auth model), note it so it can be recorded in the cross-project data-source catalog
+   (`~/.claude/llm-wiki/data-sources.md`): engine, connect-via, driver, auth model, and credential
+   env-var **names** only — **never** inline or record a password/token. Flag any secret you find
+   hard-coded in a connection string.
 4. **Repair cross-links** invalidated by moves/renames/deletes.
 5. **Append** a `log.md` entry: `## [<today>] update | <short summary>`.
 
