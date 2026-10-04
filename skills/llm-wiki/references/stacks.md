@@ -217,6 +217,7 @@ Details worth recording when present:
 - **Variables & connection:** `\set` / `-v name=value` and their use as `:name` / `:'name'` /
   `:"name"`; connection via `PGHOST`/`PGDATABASE`/`PGUSER`, `service=<name>` in `pg_service.conf`,
   or `.pgpass`. Recipes name the service/env vars, **never a connection string with a password**.
+  Record named servers/DSNs/services in the cross-project [data-source catalog](data-sources.md).
 - **Roles & grants:** which roles own objects vs. the app's runtime role; `ALTER DEFAULT
   PRIVILEGES`; RLS policies (`CREATE POLICY`, `ENABLE ROW LEVEL SECURITY`) — note them, they're
   invisible in most app code.
@@ -379,6 +380,12 @@ Do **not** tie storage to "web". Detect it on its own and document only what exi
 
 `pydantic` is validation/settings (common in web *and* data/automation code) — note it, but it is
 **not** a signal of a web app or a database.
+
+Whenever you detect a connection to a **named** data source (a SQL Server host, an ODBC DSN, an
+Oracle service, a Postgres service) — via `pyodbc` / SQLAlchemy `create_engine` / `DBI::dbConnect` /
+a `Server=`/`Data Source=`/`DSN=` string / `pg_service.conf` / `tnsnames.ora` — record it once in the
+cross-project [data-source catalog](data-sources.md) (engine, driver, auth model, credential env-var
+**names** only — never a secret). That catalog is user-global, not part of the repo's `.llm-wiki/`.
 
 ---
 

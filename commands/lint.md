@@ -44,6 +44,13 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init`.
    changed.
 8. **Structure** — pages missing frontmatter or exceeding the size budgets in
    `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/page-formats.md`.
+9. **Data-source catalog** (the user-global `~/.claude/llm-wiki/data-sources.md`, if present):
+   - **Secret leak** — any password/token/key *value* in the catalog, or a credential inlined in a
+     connection string in the repo's code or recipes (e.g. `PWD=…`, `Password=…` with a literal). Flag
+     it; the value must move to an env var / secret store and the catalog hold only the env-var name.
+   - **Catalog drift** — a named data source the repo's code connects to that is **missing** from the
+     catalog, or a catalog entry whose driver / auth model / connect form no longer matches the code.
+   See `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`.
 
 ## Output
 
@@ -55,5 +62,7 @@ suggestion. Also suggest new pages/recipes worth adding and gaps worth investiga
 - **Safe fixes** (apply when in "fix" mode): repair/remove broken links, correct index paths, add
   missing `status`/`updated` frontmatter, mark clearly-stale pages `status: stale`.
 - **Judgement fixes** (propose, don't auto-apply): rewriting stale content, creating new module
-  pages, resolving contradictions — these need the code read carefully; do them like `/llm-wiki:update`.
+  pages, resolving contradictions, adding/correcting data-source catalog entries — these need the code
+  read carefully; do them like `/llm-wiki:update`. **Never** auto-remove a flagged secret from source
+  code; report it and let the human move it to a secret store.
 - Append a `log.md` entry: `## [<today>] lint | <summary of findings and fixes applied>`.

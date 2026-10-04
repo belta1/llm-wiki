@@ -44,6 +44,12 @@
 .PARAMETER NoPathInstructions
   Never install path-scoped instructions (.github/instructions/*.instructions.md).
 
+.PARAMETER DataSourcesProfileDir
+  Write/refresh the cross-project data-source instruction file into this VS Code *user-profile*
+  instructions directory. The file (llm-wiki-data-sources.instructions.md) is generated from
+  ~/.claude/llm-wiki/data-sources.md so Copilot sees the same named servers/DSNs as Claude. Omit to
+  only print how to set it up (the location varies, so the script never guesses it). VS Code-only.
+
 .EXAMPLE
   .\scripts\install-copilot.ps1 C:\code\my-repo -Scaffold
 
@@ -61,7 +67,8 @@ param(
   [switch]$Postgres,
   [Alias("R")][switch]$RLang,
   [switch]$Slurm,
-  [switch]$NoPathInstructions
+  [switch]$NoPathInstructions,
+  [string]$DataSourcesProfileDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -134,6 +141,48 @@ function Install-File([string]$src, [string]$dest) {
   } else {
     Copy-Item -Force -LiteralPath $src -Destination $dest
     Write-Host "  updated  $dest"
+  }
+}
+
+# Write/refresh the cross-project data-source instruction file into a VS Code user-profile dir.
+# The managed <!-- BEGIN/END llm-wiki --> block is regenerated from ~/.claude/llm-wiki/data-sources.md;
+# the frontmatter/guidance outside the block (and any other file in the dir) is preserved. The
+# namespaced filename means this never collides with instruction files the user authored themselves.
+function Install-DataSources([string]$profileDir) {
+  $tpl  = Join-Path $Templates "copilot-instructions\data-sources.instructions.md"
+  $dest = Join-Path $profileDir "llm-wiki-data-sources.instructions.md"
+  Ensure-Dir $profileDir
+
+  $catalog = Join-Path $HOME ".claude\llm-wiki\data-sources.md"
+  if (Test-Path $catalog) {
+    # Strip a leading YAML frontmatter block; keep the rest as the catalog body.
+    $body = ([regex]::Replace((Read-Utf8 $catalog), "(?s)^﻿?---.*?\r?\n---\r?\n", "")).Trim()
+  } else {
+    $body = '_No data-source catalog found yet. Run `/llm-wiki:init` in Claude Code, or create `~/.claude/llm-wiki/data-sources.md`._'
+  }
+
+  if (Test-Path $dest) { $base = Read-Utf8 $dest; $created = $false }
+  else                 { $base = Read-Utf8 $tpl;  $created = $true }
+
+  $nl = if ($base -match "`r`n") { "`r`n" } else { "`n" }
+  $bodyNl = ($body -replace "`r`n", "`n") -replace "`n", $nl
+  $blockText = "<!-- BEGIN llm-wiki -->$nl$bodyNl$nl<!-- END llm-wiki -->"
+
+  if ($base -match "<!-- BEGIN llm-wiki -->") {
+    $new = [regex]::Replace($base, "(?s)<!-- BEGIN llm-wiki -->.*?<!-- END llm-wiki -->", { param($m) $blockText })
+  } else {
+    $new = $base.TrimEnd() + $nl + $nl + $blockText
+  }
+  $new = $new.TrimEnd() + $nl
+
+  if ($created) {
+    Write-Utf8 $dest $new
+    Write-Host "  created  $dest"
+  } elseif ($new -eq $base) {
+    Write-Host "  ok       $dest (data sources already current)"
+  } else {
+    Write-Utf8 $dest $new
+    Write-Host "  updated  $dest (data sources)"
   }
 }
 
@@ -236,6 +285,12 @@ if (-not $NoPathInstructions) {
   Install-PathInstructions "slurm"    $Slurm.IsPresent    { param($r) Test-HasSlurm $r }    "Slurm batch scripts (#SBATCH)"
 }
 
+# 2d) Optional: cross-project data-source catalog as a VS Code user-profile instruction file.
+if ($DataSourcesProfileDir) {
+  Write-Host "Installing data-source catalog instruction file (VS Code user profile):"
+  Install-DataSources $DataSourcesProfileDir
+}
+
 # 3) Optionally install the other tools' pointers too.
 if ($AllPointers) {
   Install-Block (Join-Path $Templates "pointers\CLAUDE.md") (Join-Path $Target "CLAUDE.md")
@@ -258,3 +313,11 @@ Write-Host "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) 
 Write-Host "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
 Write-Host "    /llm-wiki-lint. No VS Code? Paste .github\prompts\llm-wiki-init.prompt.md into any"
 Write-Host "    Copilot agent chat."
+if (-not $DataSourcesProfileDir) {
+  Write-Host ""
+  Write-Host "  - Cross-project data sources (VS Code, optional): in the Command Palette run"
+  Write-Host "    'Chat: New Instructions File' and choose 'User' to see your profile instructions folder,"
+  Write-Host "    then re-run this script with -DataSourcesProfileDir <that folder> to install a"
+  Write-Host "    user-global llm-wiki-data-sources.instructions.md generated from your Claude catalog"
+  Write-Host "    (~\.claude\llm-wiki\data-sources.md). It applies in every workspace. VS Code only."
+}

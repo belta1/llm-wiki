@@ -29,6 +29,11 @@
 #   --r                     Install the R path-scoped instructions even if not detected.
 #   --slurm                 Install the Slurm path-scoped instructions even if not detected.
 #   --no-path-instructions  Never install path-scoped instructions (.github/instructions/).
+#   --data-sources-profile-dir DIR
+#                           Write/refresh the cross-project data-source instruction file
+#                           (llm-wiki-data-sources.instructions.md) into this VS Code user-profile
+#                           instructions DIR, generated from ~/.claude/llm-wiki/data-sources.md.
+#                           Omit to only print how to set it up. VS Code-only.
 #   -h, --help              Show this help.
 #
 set -euo pipefail
@@ -45,6 +50,7 @@ POSTGRES=0
 R_LANG=0
 SLURM=0
 NO_PATH_INSTRUCTIONS=0
+DATA_SOURCES_PROFILE_DIR=""
 
 # Print the header comment block (everything after the shebang up to the first non-comment line).
 usage() { awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "${BASH_SOURCE[0]}"; }
@@ -59,6 +65,7 @@ while [ $# -gt 0 ]; do
     --r) R_LANG=1 ;;
     --slurm) SLURM=1 ;;
     --no-path-instructions) NO_PATH_INSTRUCTIONS=1 ;;
+    --data-sources-profile-dir) DATA_SOURCES_PROFILE_DIR="${2:-}"; shift ;;
     -*) echo "error: unknown option '$1'" >&2; usage; exit 1 ;;
     *) TARGET="$1" ;;
   esac
@@ -113,6 +120,51 @@ install_file() {
   else
     cp "$src" "$dest"
     echo "  updated  $dest"
+  fi
+}
+
+# Write/refresh the cross-project data-source instruction file into a VS Code user-profile dir.
+# The managed <!-- BEGIN/END llm-wiki --> block is regenerated from ~/.claude/llm-wiki/data-sources.md;
+# frontmatter/guidance outside the block (and any other file in the dir) is preserved. The namespaced
+# filename means this never collides with instruction files the user authored themselves.
+install_data_sources() {
+  local profile_dir="$1"
+  local tpl="$TEMPLATES/copilot-instructions/data-sources.instructions.md"
+  local dest="$profile_dir/llm-wiki-data-sources.instructions.md"
+  local catalog="$HOME/.claude/llm-wiki/data-sources.md"
+  mkdir -p "$profile_dir"
+
+  # Block body: the catalog with a leading YAML frontmatter block stripped, else a placeholder.
+  local bodyfile; bodyfile="$(mktemp)"
+  if [ -f "$catalog" ]; then
+    awk 'NR==1 && $0=="---"{f=1; next} f==1 && $0=="---"{f=2; next} f==2 || f==0' "$catalog" > "$bodyfile"
+  else
+    printf '%s\n' '_No data-source catalog found yet. Run `/llm-wiki:init` in Claude Code, or create `~/.claude/llm-wiki/data-sources.md`._' > "$bodyfile"
+  fi
+
+  # Base is the existing file, or the template scaffold on first install.
+  local base created=0
+  if [ -f "$dest" ]; then base="$dest"; else base="$tpl"; created=1; fi
+
+  local tmp; tmp="$(mktemp)"
+  if grep -q '<!-- BEGIN llm-wiki -->' "$base"; then
+    { sed '/<!-- BEGIN llm-wiki -->/,$d' "$base"
+      printf '%s\n' '<!-- BEGIN llm-wiki -->'
+      cat "$bodyfile"
+      printf '%s\n' '<!-- END llm-wiki -->'
+      sed '1,/<!-- END llm-wiki -->/d' "$base"
+    } > "$tmp"
+  else
+    { cat "$base"; printf '\n%s\n' '<!-- BEGIN llm-wiki -->'; cat "$bodyfile"; printf '%s\n' '<!-- END llm-wiki -->'; } > "$tmp"
+  fi
+  rm -f "$bodyfile"
+
+  if [ "$created" -eq 1 ]; then
+    mv "$tmp" "$dest"; echo "  created  $dest"
+  elif cmp -s "$tmp" "$dest"; then
+    rm -f "$tmp"; echo "  ok       $dest (data sources already current)"
+  else
+    mv "$tmp" "$dest"; echo "  updated  $dest (data sources)"
   fi
 }
 
@@ -203,6 +255,12 @@ if [ "$NO_PATH_INSTRUCTIONS" -eq 0 ]; then
   install_path_instructions slurm    "$SLURM"    has_slurm    "Slurm batch scripts (#SBATCH)"
 fi
 
+# 2d) Optional: cross-project data-source catalog as a VS Code user-profile instruction file.
+if [ -n "$DATA_SOURCES_PROFILE_DIR" ]; then
+  echo "Installing data-source catalog instruction file (VS Code user profile):"
+  install_data_sources "$DATA_SOURCES_PROFILE_DIR"
+fi
+
 # 3) Optionally install the other tools' pointers too.
 if [ "$ALL_POINTERS" -eq 1 ]; then
   install_block "$TEMPLATES/pointers/CLAUDE.md" "$TARGET/CLAUDE.md"
@@ -225,3 +283,11 @@ echo "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) and ru
 echo "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
 echo "    /llm-wiki-lint. No VS Code? Paste the text of .github/prompts/llm-wiki-init.prompt.md into"
 echo "    any Copilot agent chat."
+if [ -z "$DATA_SOURCES_PROFILE_DIR" ]; then
+  echo
+  echo "  - Cross-project data sources (VS Code, optional): run 'Chat: New Instructions File' from the"
+  echo "    Command Palette and choose 'User' to find your profile instructions folder, then re-run with"
+  echo "    --data-sources-profile-dir <that folder> to install a user-global"
+  echo "    llm-wiki-data-sources.instructions.md generated from ~/.claude/llm-wiki/data-sources.md."
+  echo "    It applies in every workspace. VS Code only."
+fi

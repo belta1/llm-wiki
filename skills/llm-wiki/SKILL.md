@@ -1,6 +1,6 @@
 ---
 name: llm-wiki
-description: Use when working in a repository that contains a `.llm-wiki/` directory (a compiled codebase knowledge base) — Python, Node.js, T-SQL/SQL Server (sqlproj, SQL scripts, SSIS), PostgreSQL (psql scripts), R (packages, targets, Shiny, Quarto), Slurm/HPC batch jobs, or mixed. Read `.llm-wiki/index.md` before broad code searches to find where things live cheaply, and after making substantive code or schema changes, update the affected wiki pages and append a `log.md` entry. Keeps the wiki current so future sessions start warm and use fewer tokens.
+description: Use when working in a repository that contains a `.llm-wiki/` directory (a compiled codebase knowledge base) — Python, Node.js, T-SQL/SQL Server (sqlproj, SQL scripts, SSIS), PostgreSQL (psql scripts), R (packages, targets, Shiny, Quarto), Slurm/HPC batch jobs, or mixed. Read `.llm-wiki/index.md` before broad code searches to find where things live cheaply, and after making substantive code or schema changes, update the affected wiki pages and append a `log.md` entry. Also maintains a cross-project data-source catalog — recognizing and remembering common connections (named SQL Servers, ODBC DSNs, Oracle/Postgres sources) so you reuse the right driver/auth without storing secrets. Keeps the wiki current so future sessions start warm and use fewer tokens.
 ---
 
 # LLM Wiki maintainer
@@ -45,6 +45,26 @@ Update the wiki in the same session:
 4. **Append a `log.md` entry** using the parseable prefix:
    `## [YYYY-MM-DD] update | <short summary>`.
 
+## Data sources (cross-project catalog)
+
+Named data sources recur across repos — a SQL Server like `SRVDATSCIENCE02`, an ODBC DSN like
+`ORABIPROD`, a Postgres service. Record each **once** in a user-global catalog so any session
+recognizes it and reuses the right connection form.
+
+- **Catalog location:** `~/.claude/llm-wiki/data-sources.md` (Windows:
+  `%USERPROFILE%\.claude\llm-wiki\data-sources.md`). It lives in your home, **not** in the repo, and is
+  shared across all repos. Create it on first need.
+- **Consult it** when you start work that touches data access, and whenever you write connection code.
+- **Recognize:** when you see a connection in code (`pyodbc.connect`, SQLAlchemy `create_engine`,
+  `DBI::dbConnect`, a `Server=`/`DSN=` string, `pg_service`), match the host/DSN to a catalog entry and
+  reuse its driver and auth model. **Remember:** if it's not in the catalog, add it (upsert by name —
+  never duplicate an existing source).
+- **Never store secrets.** Record engine / host / DSN / driver / auth *method* and the **names** of the
+  env vars or secret-store entries that hold credentials — never a password or token. If you find a
+  credential inlined in code, record the source without it and flag the leak.
+- Detection patterns, the table format, auth-model inference, and the GitHub Copilot mirror are in
+  [references/data-sources.md](references/data-sources.md).
+
 ## Principles
 
 - **Link, don't duplicate.** Pages stay short; point to the code and to each other rather than
@@ -61,6 +81,9 @@ Update the wiki in the same session:
   [references/page-formats.md](references/page-formats.md).
 - Why and how the wiki saves tokens, plus page-size budgets: see
   [references/token-efficiency.md](references/token-efficiency.md).
+- The cross-project **data-source catalog** — recognizing/remembering named connections, the table
+  format, auth-model inference, the never-store-secrets rule, and the Copilot mirror: see
+  [references/data-sources.md](references/data-sources.md).
 - Detecting the stack and writing stack-correct recipes/pages: see
   [references/stacks.md](references/stacks.md). It covers Python & Node package managers and tooling,
   the **T-SQL** toolchains (SDK-style/classic `.sqlproj` + sqlpackage, sqlcmd script repos, SSIS +
