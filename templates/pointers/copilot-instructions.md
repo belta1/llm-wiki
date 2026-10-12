@@ -15,4 +15,8 @@ When answering questions or suggesting edits about this codebase:
 
 See `.llm-wiki/README.md` for the full contract. When you make a substantive change, the affected
 `.llm-wiki/` pages should be updated and a line appended to `.llm-wiki/log.md`.
+
+For people (not Copilot): the `/llm-wiki-view` prompt builds a rendered review dashboard at
+`.llm-wiki/view/index.html` — open it in VS Code's Simple Browser. Base suggestions on the Markdown
+pages above, not the generated HTML.
 <!-- END llm-wiki -->

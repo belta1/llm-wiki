@@ -14,4 +14,7 @@ entry to [`.llm-wiki/log.md`](.llm-wiki/log.md): `## [YYYY-MM-DD] update | <summ
 source of truth; if a page disagrees with the code, fix the page.
 
 See [`.llm-wiki/README.md`](.llm-wiki/README.md) for the full contract.
+
+_Humans:_ `/llm-wiki:view` builds a rendered review dashboard at `.llm-wiki/view/index.html` (opens
+as an Artifact). It's for people, not agents — read the Markdown above, not the generated HTML.
 <!-- END llm-wiki -->

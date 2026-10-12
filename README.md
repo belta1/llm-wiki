@@ -137,6 +137,34 @@ The index says *where* code is, so the agent reads a couple of targeted files in
 whole tree. Module pages give entry points and gotchas; recipes encode how to do common tasks once.
 See [skills/llm-wiki/references/token-efficiency.md](skills/llm-wiki/references/token-efficiency.md).
 
+## Reviewing the wiki (HTML view)
+
+The `.llm-wiki/` pages are **Markdown on purpose** — that's what keeps them cheap for an agent to read
+(token-light, greppable, diff-friendly), and it's the whole point of the plugin. But Markdown is a
+wall of text to *skim*. So the plugin separates two jobs:
+
+- **Canon** — the `.llm-wiki/*.md` pages. The source of truth that **agents read**. Never changes
+  shape.
+- **View** — a single derived `.llm-wiki/view/index.html` dashboard that **humans read**: the Map as a
+  filterable grid, a page link-graph (inline SVG), a freshness heatmap driven by each page's
+  `updated:`/`status:`, the data sources it connects to (SQL Server, Oracle, PostgreSQL, SAS…),
+  module cards, and the log as a timeline.
+
+The guiding idea: **agents read source; humans read render.** HTML would only *cost* an agent tokens
+(and GitHub sanitizes raw HTML so it won't render live there), so the view is generated on demand,
+kept out of agent reads, and `.gitignore`d by default — regenerate it any time with `/llm-wiki:view`.
+It's a build artifact, not canon: if something's wrong, fix the Markdown with `/llm-wiki:update`, then
+rebuild the view.
+
+| Tool | How to review | Notes |
+|------|---------------|-------|
+| **Claude** | `/llm-wiki:view`, then view `.llm-wiki/view/index.html` as an **Artifact** | Renders in-app; or open the file in a browser |
+| **GitHub Copilot** | `/llm-wiki-view` prompt, then VS Code **Simple Browser** | `install-copilot --view` scaffolds the viewer template |
+| **GitHub.com** | Markdown stays the canonical rendered view | Raw HTML is sanitized; host via GitHub Pages only if you want a live site |
+
+See [skills/llm-wiki/references/view-layer.md](skills/llm-wiki/references/view-layer.md) for the
+generation model and the data shape.
+
 ## Install
 
 This repo doubles as a single-plugin marketplace:
@@ -158,6 +186,7 @@ Run inside the repo you want to document:
 | `/llm-wiki:init` | Scan the repo and bootstrap `.llm-wiki/` + the three pointer files |
 | `/llm-wiki:update` | Refresh affected pages after code changes; append a log entry |
 | `/llm-wiki:lint` | Health-check for stale claims, orphan pages, broken links, drift |
+| `/llm-wiki:view` | Build a human-only HTML review dashboard (`.llm-wiki/view/index.html`) from the Markdown |
 
 The bundled `llm-wiki` skill also triggers automatically when you work in a repo that already has a
 `.llm-wiki/`, reminding the agent to read the index first and maintain the wiki after edits.
@@ -202,6 +231,7 @@ own content, and reports `created` / `updated` / `ok` per file). Options:
 | bash | PowerShell | Does |
 |------|------------|------|
 | `--scaffold` | `-Scaffold` | also copy starter `.llm-wiki/` pages (if none exist) |
+| `--view` | `-View` | also scaffold the human-only HTML view (`.llm-wiki/view/index.html`) and gitignore it |
 | `--all-pointers` | `-AllPointers` | also install the `CLAUDE.md` and `AGENTS.md` pointers |
 | `--tsql` | `-Tsql` | install `tsql.instructions.md` even if T-SQL isn't detected |
 | `--postgres` | `-Postgres` | install `postgres.instructions.md` even if PostgreSQL isn't detected |
@@ -237,6 +267,7 @@ Copilot Chat. The installer drops three into `.github/prompts/`:
 | `llm-wiki-init.prompt.md` | `/llm-wiki-init` | scans the repo and fills in / creates the wiki pages |
 | `llm-wiki-update.prompt.md` | `/llm-wiki-update` | refreshes affected pages after code changes |
 | `llm-wiki-lint.prompt.md` | `/llm-wiki-lint` | health-checks the wiki for drift and broken links |
+| `llm-wiki-view.prompt.md` | `/llm-wiki-view` | builds the human-only HTML review dashboard (`.llm-wiki/view/index.html`) |
 
 To populate: run **`/llm-wiki-init`** in Copilot Chat. The prompts carry no `agent:` in their
 frontmatter, so they run in whichever mode you have selected — **ask**, **plan**, **agent**, or a
@@ -271,9 +302,10 @@ opencode, and a growing set of agents. Same content, pointing into the same `.ll
 
 ```
 .claude-plugin/   plugin.json + marketplace.json
-skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks)
-commands/         init, update, lint
+skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks, view layer)
+commands/         init, update, lint, view
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
+                  + view/ (the HTML review-dashboard template)
                   + copilot-prompts/ (/llm-wiki-* prompt files) + copilot-instructions/ (path-scoped: T-SQL, PostgreSQL, R, Slurm)
 examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/
                   + tsql-database/ + tsql-warehouse/ + postgres-database/ + r-analysis/

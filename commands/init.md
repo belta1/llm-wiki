@@ -86,8 +86,10 @@ closest worked example for page shape and brevity:
      **persistence** separately.
    - **Hybrid / monorepo** (see step 3b).
    - **Data sources** — scan connection code for named data sources (pyodbc / SQLAlchemy
-     `create_engine` / `DBI::dbConnect`, `Server=`/`Data Source=`/`DSN=` strings, `pg_service.conf`,
-     `tnsnames.ora`, `.env.example`). For each, **upsert** an entry (match by host/DSN name, don't
+     `create_engine` / `DBI::dbConnect` / `saspy.SASsession`, `Server=`/`Data Source=`/`DSN=` strings,
+     `pg_service.conf`, `tnsnames.ora`, `sascfg_personal.py` + `*.sas` `libname`/`signon`,
+     `.env.example`) — map **SQL Server, Oracle, PostgreSQL and SAS** especially, each by its own
+     driver/connection shape. For each, **upsert** an entry (match by host/DSN name, don't
      duplicate) into the user-global catalog `~/.claude/llm-wiki/data-sources.md` — engine, connect-via,
      driver/DSN, auth model, and credential env-var **names** only. **Never record a secret**; flag any
      credential inlined in code. Follow
@@ -158,7 +160,9 @@ closest worked example for page shape and brevity:
 
 6. **Report** to the user: the pages created, the modules covered, any **data sources** added to or
    matched in the cross-project catalog, and anything you were unsure about or deliberately left thin,
-   so they can direct follow-ups.
+   so they can direct follow-ups. Mention that `/llm-wiki:view` can build a human-only HTML review
+   dashboard (`.llm-wiki/view/index.html`) from these pages — offer to run it, but don't generate it
+   unprompted.
 
 ## Principles
 

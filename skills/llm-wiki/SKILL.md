@@ -56,9 +56,10 @@ recognizes it and reuses the right connection form.
   shared across all repos. Create it on first need.
 - **Consult it** when you start work that touches data access, and whenever you write connection code.
 - **Recognize:** when you see a connection in code (`pyodbc.connect`, SQLAlchemy `create_engine`,
-  `DBI::dbConnect`, a `Server=`/`DSN=` string, `pg_service`), match the host/DSN to a catalog entry and
-  reuse its driver and auth model. **Remember:** if it's not in the catalog, add it (upsert by name —
-  never duplicate an existing source).
+  `DBI::dbConnect`, `saspy.SASsession`, a `Server=`/`DSN=` string, `pg_service`, `sascfg_personal.py`),
+  match the host/DSN/cfgname to a catalog entry and reuse its driver and auth model — this spans
+  **SQL Server, Oracle, PostgreSQL and SAS**. **Remember:** if it's not in the catalog, add it (upsert
+  by name — never duplicate an existing source).
 - **Never store secrets.** Record engine / host / DSN / driver / auth *method* and the **names** of the
   env vars or secret-store entries that hold credentials — never a password or token. If you find a
   credential inlined in code, record the source without it and flag the leak.
@@ -79,6 +80,11 @@ recognizes it and reuses the right connection form.
 
 - Page formats (frontmatter, cross-links, the index table shape): see
   [references/page-formats.md](references/page-formats.md).
+- **The Markdown is the canon — don't read or maintain the HTML view as an agent.** `/llm-wiki:view`
+  can generate a human-only review dashboard at `.llm-wiki/view/index.html` (derived from these pages,
+  gitignored by default). It is for people to skim; never read it to orient (it just costs tokens for
+  markup) and never treat it as a source — fix the Markdown, then regenerate. See
+  [references/view-layer.md](references/view-layer.md).
 - Why and how the wiki saves tokens, plus page-size budgets: see
   [references/token-efficiency.md](references/token-efficiency.md).
 - The cross-project **data-source catalog** — recognizing/remembering named connections, the table
@@ -114,4 +120,5 @@ recognizes it and reuses the right connection form.
 
 If the plugin is installed, these commands drive the wiki explicitly:
 `/llm-wiki:init` (bootstrap), `/llm-wiki:update` (refresh after changes), `/llm-wiki:lint`
-(health-check). You can also do any of this by hand following the guidance above.
+(health-check), `/llm-wiki:view` (build the human-only HTML review dashboard from the canon). You can
+also do any of this by hand following the guidance above.

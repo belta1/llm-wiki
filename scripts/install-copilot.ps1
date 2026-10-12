@@ -26,6 +26,10 @@
 .PARAMETER Scaffold
   Also copy the template wiki pages into <repo>\.llm-wiki\ if none exists.
 
+.PARAMETER View
+  Also scaffold the HTML view (<repo>\.llm-wiki\view\index.html) and gitignore it. It's a human-only
+  review dashboard; regenerate with the /llm-wiki-view prompt. Agents still read the Markdown.
+
 .PARAMETER AllPointers
   Also install CLAUDE.md and AGENTS.md pointers (not just Copilot).
 
@@ -62,6 +66,7 @@
 param(
   [string]$Target = ".",
   [switch]$Scaffold,
+  [switch]$View,
   [switch]$AllPointers,
   [switch]$Tsql,
   [switch]$Postgres,
@@ -128,6 +133,23 @@ function Install-Block([string]$tpl, [string]$dest) {
     Write-Utf8 $dest ($content.TrimEnd() + $nl + $nl + $block + $nl)
     Write-Host "  appended $dest (managed block)"
   }
+}
+
+# Ensure the target repo's .gitignore ignores a path (idempotent).
+function Add-GitIgnore([string]$line) {
+  $gi = Join-Path $Target ".gitignore"
+  if (Test-Path $gi) {
+    if (@(Get-Content -LiteralPath $gi) -contains $line) {
+      Write-Host "  ok       .gitignore already ignores $line"; return
+    }
+    $existing = Read-Utf8 $gi
+    $nl = if ($existing -match "`r`n") { "`r`n" } else { "`n" }
+    Write-Utf8 $gi ($existing.TrimEnd() + $nl + $nl +
+      "# llm-wiki - derived HTML view (regenerate with /llm-wiki-view)" + $nl + $line + $nl)
+  } else {
+    Write-Utf8 $gi ("# llm-wiki - derived HTML view (regenerate with /llm-wiki-view)`r`n" + $line + "`r`n")
+  }
+  Write-Host "  updated  $gi (ignore $line)"
 }
 
 # Copy a plugin-owned file, reporting created / updated / unchanged.
@@ -265,6 +287,17 @@ if ($Scaffold) {
   }
 }
 
+# 1b) Optionally scaffold the human-only HTML view and gitignore it.
+if ($View) {
+  $viewTpl = Join-Path $Templates "view\index.html"
+  if (Test-Path $viewTpl) {
+    Install-File $viewTpl (Join-Path $Target ".llm-wiki\view\index.html")
+    Add-GitIgnore ".llm-wiki/view/"
+  } else {
+    Write-Host "  skip     view template not found at $viewTpl"
+  }
+}
+
 # 2) Install the Copilot pointer (always).
 Install-Block (Join-Path $Templates "pointers\copilot-instructions.md") (Join-Path $Target ".github\copilot-instructions.md")
 
@@ -313,6 +346,9 @@ Write-Host "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) 
 Write-Host "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
 Write-Host "    /llm-wiki-lint. No VS Code? Paste .github\prompts\llm-wiki-init.prompt.md into any"
 Write-Host "    Copilot agent chat."
+Write-Host "  - For a human review dashboard, run '/llm-wiki-view' (or re-run this script with -View) to"
+Write-Host "    build .llm-wiki\view\index.html, then open it in VS Code's Simple Browser. It's derived"
+Write-Host "    from the Markdown and gitignored; agents keep reading the Markdown."
 if (-not $DataSourcesProfileDir) {
   Write-Host ""
   Write-Host "  - Cross-project data sources (VS Code, optional): in the Command Palette run"

@@ -18,11 +18,14 @@
 # Idempotent: re-running replaces only the managed block / plugin-owned files.
 #
 # Usage:
-#   scripts/install-copilot.sh [TARGET_REPO] [--scaffold] [--all-pointers]
+#   scripts/install-copilot.sh [TARGET_REPO] [--scaffold] [--view] [--all-pointers]
 #                              [--tsql] [--postgres] [--r] [--slurm] [--no-path-instructions]
 #
 #   TARGET_REPO             Path to the repo to install into (default: current directory).
 #   --scaffold              Also copy the template wiki pages into <repo>/.llm-wiki/ if none exists.
+#   --view                  Also scaffold the HTML view (<repo>/.llm-wiki/view/index.html) and
+#                           gitignore it. It's a human-only review dashboard; regenerate with the
+#                           /llm-wiki-view prompt. Agents still read the Markdown.
 #   --all-pointers          Also install CLAUDE.md and AGENTS.md pointers (not just Copilot).
 #   --tsql                  Install the T-SQL path-scoped instructions even if not detected.
 #   --postgres              Install the PostgreSQL path-scoped instructions even if not detected.
@@ -44,6 +47,7 @@ TEMPLATES="$PLUGIN_ROOT/templates"
 
 TARGET="."
 SCAFFOLD=0
+VIEW=0
 ALL_POINTERS=0
 TSQL=0
 POSTGRES=0
@@ -59,6 +63,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) usage; exit 0 ;;
     --scaffold) SCAFFOLD=1 ;;
+    --view) VIEW=1 ;;
     --all-pointers) ALL_POINTERS=1 ;;
     --tsql) TSQL=1 ;;
     --postgres) POSTGRES=1 ;;
@@ -106,6 +111,17 @@ install_block() {
     cat "$tpl" >> "$dest"
     echo "  appended $dest (managed block)"
   fi
+}
+
+# Ensure the target repo's .gitignore ignores a path (idempotent).
+ignore_path() {
+  local line="$1" gi="$TARGET/.gitignore"
+  if [ -f "$gi" ] && grep -qxF "$line" "$gi" 2>/dev/null; then
+    echo "  ok       .gitignore already ignores $line"
+    return
+  fi
+  printf '\n# llm-wiki — derived HTML view (regenerate with /llm-wiki-view)\n%s\n' "$line" >> "$gi"
+  echo "  updated  $gi (ignore $line)"
 }
 
 # Copy a plugin-owned file, reporting created / updated / unchanged.
@@ -237,6 +253,16 @@ if [ "$SCAFFOLD" -eq 1 ]; then
   fi
 fi
 
+# 1b) Optionally scaffold the human-only HTML view and gitignore it.
+if [ "$VIEW" -eq 1 ]; then
+  if [ -f "$TEMPLATES/view/index.html" ]; then
+    install_file "$TEMPLATES/view/index.html" "$TARGET/.llm-wiki/view/index.html"
+    ignore_path ".llm-wiki/view/"
+  else
+    echo "  skip     view template not found at $TEMPLATES/view/index.html"
+  fi
+fi
+
 # 2) Install the Copilot pointer (always).
 install_block "$TEMPLATES/pointers/copilot-instructions.md" "$TARGET/.github/copilot-instructions.md"
 
@@ -283,6 +309,9 @@ echo "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) and ru
 echo "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
 echo "    /llm-wiki-lint. No VS Code? Paste the text of .github/prompts/llm-wiki-init.prompt.md into"
 echo "    any Copilot agent chat."
+echo "  - For a human review dashboard, run '/llm-wiki-view' (or re-run this script with --view) to"
+echo "    build .llm-wiki/view/index.html, then open it in VS Code's Simple Browser. It's derived from"
+echo "    the Markdown and gitignored; agents keep reading the Markdown."
 if [ -z "$DATA_SOURCES_PROFILE_DIR" ]; then
   echo
   echo "  - Cross-project data sources (VS Code, optional): run 'Chat: New Instructions File' from the"

@@ -14,4 +14,7 @@ entry to `.llm-wiki/log.md`: `## [YYYY-MM-DD] update | <summary>`. The code is t
 if a page disagrees with the code, fix the page.
 
 See `.llm-wiki/README.md` for the full contract.
+
+_Humans:_ a rendered review dashboard can be built at `.llm-wiki/view/index.html` (`/llm-wiki:view`
+or the `/llm-wiki-view` prompt). It's for people, not agents — read the Markdown above, not the HTML.
 <!-- END llm-wiki -->

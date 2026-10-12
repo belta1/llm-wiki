@@ -66,11 +66,13 @@ doesn't exist yet, create it.
   analysis (targets) / Shiny app / Quarto reports**, **HPC batch pipeline on Slurm**. Shape the pages
   to what the repo *actually is*.
 - **Data sources** — when you find a connection to a named data source (pyodbc / SQLAlchemy
-  `create_engine` / `DBI::dbConnect`, a `Server=`/`Data Source=`/`DSN=` string, `pg_service.conf`,
-  `tnsnames.ora`), note it so it can be recorded in the cross-project data-source catalog
-  (`~/.claude/llm-wiki/data-sources.md`): engine, connect-via, driver, auth model, and credential
-  env-var **names** only — **never** a password/token. Flag any secret hard-coded in a connection
-  string. (This catalog is user-global, not part of the repo's `.llm-wiki/`.)
+  `create_engine` / `DBI::dbConnect` / `saspy.SASsession`, a `Server=`/`Data Source=`/`DSN=` string,
+  `pg_service.conf`, `tnsnames.ora`, `sascfg_personal.py` or a `*.sas` `libname`/`signon`), note it so
+  it can be recorded in the cross-project data-source catalog (`~/.claude/llm-wiki/data-sources.md`):
+  engine (**SQL Server, Oracle, PostgreSQL, SAS**, …), connect-via, driver/cfgname, auth model, and
+  credential env-var / authinfo-key **names** only — **never** a password/token. Flag any secret
+  hard-coded in a connection string. (This catalog is user-global, not part of the repo's
+  `.llm-wiki/`.)
 - **Persistence is a separate axis** — document models + migrations only if an ORM is present
   (SQLAlchemy, Django, Prisma, Drizzle…). Many analytics/automation repos have no database; don't
   invent a migration recipe for them. In a T-SQL repo the database *is* the code: document schemas

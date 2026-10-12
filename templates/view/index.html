@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wiki View</title>
+<!--
+  llm-wiki — HTML view layer (derived, human-only).
+
+  This file is a self-contained viewer for a .llm-wiki/ knowledge base. It renders the
+  Markdown *canon* (index.md, module pages, log.md) as a review dashboard. The canon stays
+  the source of truth that AI agents read; this page is never loaded into an agent's context.
+
+  GENERATION CONTRACT
+  -------------------
+  Everything below is fixed. The only thing a generator replaces is the JSON between the
+  <script id="wiki-data"> tags near the bottom of this file. /llm-wiki:view parses the canon
+  into that JSON and writes the result to .llm-wiki/view/index.html. The sample data shipped
+  here describes the `tasks-api` example wiki so the template renders something real out of
+  the box.
+-->
+<style>
+  /* Layout: a single scroll of review panels — summary tiles, then map, then graph/heatmap, then log.
+     Color: cool-biased neutrals with one indigo accent; green/amber/red reserved for freshness only.
+     Type: IBM Plex Sans for prose, IBM Plex Mono for paths, labels and data. */
+  :root {
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #eef1f8;
+    --fg: #1a1f2e;
+    --muted: #5b6480;
+    --faint: #8b93ad;
+    --border: #dde2ef;
+    --border-strong: #c7cee0;
+    --accent: #4f46e5;
+    --accent-weak: #e7e6fb;
+    --ok: #1f9d57;
+    --ok-weak: #dcf3e5;
+    --warn: #b8780a;
+    --warn-weak: #fbeecf;
+    --crit: #cf3b43;
+    --crit-weak: #fadfe0;
+    --draft: #5a7d9a;
+    --draft-weak: #e1eaf2;
+    --shadow: 0 1px 2px rgba(20, 28, 60, .06), 0 6px 20px rgba(20, 28, 60, .05);
+    --radius: 12px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1118;
+      --surface: #161b26;
+      --surface-2: #1d2432;
+      --fg: #e7eaf3;
+      --muted: #9aa3bd;
+      --faint: #6b748f;
+      --border: #272f40;
+      --border-strong: #37415a;
+      --accent: #8b85ff;
+      --accent-weak: #262449;
+      --ok: #4ecb7f;
+      --ok-weak: #15301f;
+      --warn: #e0a94a;
+      --warn-weak: #332813;
+      --crit: #f0787e;
+      --crit-weak: #361a1c;
+      --draft: #8fb0cc;
+      --draft-weak: #16222e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1118;
+    --surface: #161b26;
+    --surface-2: #1d2432;
+    --fg: #e7eaf3;
+    --muted: #9aa3bd;
+    --faint: #6b748f;
+    --border: #272f40;
+    --border-strong: #37415a;
+    --accent: #8b85ff;
+    --accent-weak: #262449;
+    --ok: #4ecb7f;
+    --ok-weak: #15301f;
+    --warn: #e0a94a;
+    --warn-weak: #332813;
+    --crit: #f0787e;
+    --crit-weak: #361a1c;
+    --draft: #8fb0cc;
+    --draft-weak: #16222e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-block: 28px 56px;
+    padding-inline: 16px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  /* Header */
+  header.top { display: flex; flex-wrap: wrap; gap: 16px 20px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+  .title-block { min-width: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 6px; }
+  h1 { font-size: clamp(1.5rem, 3.5vw, 2.1rem); font-weight: 600; margin: 0; line-height: 1.1; text-wrap: balance; }
+  .summary { color: var(--muted); margin: 10px 0 0; max-width: 62ch; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .theme-toggle {
+    font: inherit; font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .theme-toggle:hover { border-color: var(--border-strong); color: var(--fg); }
+
+  /* Section scaffolding */
+  section { margin-top: 36px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .sec-head h2 { font-size: 1rem; font-weight: 600; margin: 0; letter-spacing: .01em; }
+  .sec-head .count { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .sec-note { font-size: 12.5px; color: var(--faint); margin: -6px 0 14px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+  /* Stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .tile .k { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .tile .v { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .tile .sub { font-size: 12px; color: var(--muted); }
+
+  /* Stack badges */
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stack .chip { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 13px; display: inline-flex; gap: 7px; align-items: baseline; }
+  .stack .chip b { font-weight: 600; }
+  .stack .chip code, code.path { font-family: var(--mono); font-size: 12.5px; }
+
+  /* Map table */
+  .map-tools { display: flex; gap: 10px; margin-bottom: 12px; }
+  .filter { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--fg); }
+  .filter::placeholder { color: var(--faint); }
+  .table-scroll { overflow-x: auto; border-radius: var(--radius); }
+  table.map { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  table.map th, table.map td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.map thead th { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+  table.map tr:last-child td { border-bottom: none; }
+  table.map td.area { font-weight: 600; white-space: nowrap; }
+  .paths { display: flex; flex-wrap: wrap; gap: 5px; }
+  code.path { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; color: var(--muted); }
+  td.more a { font-family: var(--mono); font-size: 12.5px; }
+  td.more .dash { color: var(--faint); }
+
+  /* Task router cards */
+  .tasks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .task { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .task .label { font-weight: 600; }
+  .task .targets { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  /* Two-column: graph + heatmap */
+  .split { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+  .panel { padding: 18px; }
+  .panel h3 { margin: 0 0 4px; font-size: .95rem; font-weight: 600; }
+  .panel .hint { font-size: 12px; color: var(--faint); margin: 0 0 12px; }
+
+  /* Link graph */
+  .graph-box { width: 100%; }
+  svg.graph { width: 100%; height: auto; display: block; }
+  svg.graph .edge { stroke: var(--border-strong); stroke-width: 1.4; transition: stroke .15s, stroke-width .15s, opacity .15s; }
+  svg.graph .node circle { fill: var(--surface-2); stroke: var(--border-strong); stroke-width: 1.5; transition: fill .15s, stroke .15s; }
+  svg.graph .node.index circle { fill: var(--accent-weak); stroke: var(--accent); }
+  svg.graph .node.module circle { stroke: var(--accent); }
+  svg.graph .node text { font-family: var(--mono); font-size: 11px; fill: var(--fg); }
+  svg.graph .node .sub { fill: var(--faint); font-size: 9.5px; }
+  svg.graph.has-active .edge { opacity: .25; }
+  svg.graph.has-active .node { opacity: .3; }
+  svg.graph .edge.lit { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+  svg.graph .node.lit { opacity: 1; }
+  svg.graph .node.lit circle { fill: var(--accent-weak); stroke: var(--accent); }
+  svg.graph .node { cursor: default; }
+
+  /* Heatmap */
+  .heat { display: flex; flex-direction: column; gap: 7px; }
+  .heat .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border); }
+  .heat .row .name { font-family: var(--mono); font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .heat .row .age { font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .heat .row.fresh { background: var(--ok-weak); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+  .heat .row.fresh .age { color: var(--ok); }
+  .heat .row.aging { background: var(--warn-weak); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .heat .row.aging .age { color: var(--warn); }
+  .heat .row.overdue, .heat .row.stale { background: var(--crit-weak); border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
+  .heat .row.overdue .age, .heat .row.stale .age { color: var(--crit); }
+  .heat .row.draft { background: var(--draft-weak); border-color: color-mix(in srgb, var(--draft) 35%, transparent); }
+  .heat .row.draft .age { color: var(--draft); }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  /* Module cards */
+  .modules { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .module { padding: 16px 18px; scroll-margin-top: 16px; }
+  .module h3 { margin: 0 0 2px; font-size: 1rem; font-weight: 600; }
+  .module .cover { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 8px; }
+  .module p.p { margin: 0 0 10px; color: var(--muted); font-size: 13.5px; }
+  .module .files { display: flex; flex-direction: column; gap: 4px; }
+  .module .files .f { font-family: var(--mono); font-size: 12px; color: var(--fg); display: flex; gap: 8px; }
+  .module .files .f .dot { color: var(--accent); }
+  .module.flash { animation: flash 1.4s ease; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: var(--shadow); } }
+
+  /* Log timeline */
+  .timeline { position: relative; padding-left: 26px; }
+  .timeline::before { content: ""; position: absolute; left: 7px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
+  .entry { position: relative; padding: 4px 0 16px; }
+  .entry:last-child { padding-bottom: 0; }
+  .entry .marker { position: absolute; left: -26px; top: 6px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--bg); }
+  .entry.init .marker { background: var(--accent); }
+  .entry.update .marker { background: var(--ok); }
+  .entry.lint .marker { background: var(--warn); }
+  .entry .meta { font-family: var(--mono); font-size: 11.5px; display: flex; gap: 8px; align-items: center; margin-bottom: 3px; }
+  .entry .op { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .entry.init .op { color: var(--accent); }
+  .entry.update .op { color: var(--ok); }
+  .entry.lint .op { color: var(--warn); }
+  .entry .date { color: var(--faint); }
+  .entry .text { font-size: 13.5px; color: var(--fg); }
+
+  /* Data sources */
+  .sources { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .source { padding: 14px 16px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; }
+  .source .dot { width: 10px; height: 10px; border-radius: 50%; grid-row: span 2; align-self: center; }
+  .source .name { font-family: var(--mono); font-size: 13.5px; font-weight: 600; }
+  .source .engine { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+  .source .meta2 { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+  .source .auth { grid-column: 2; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+
+  footer.foot { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--faint); }
+  footer.foot code { font-family: var(--mono); }
+
+  @media (max-width: 760px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .tasks, .modules { grid-template-columns: 1fr; }
+    .split { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title-block">
+      <p class="eyebrow" id="eyebrow">.llm-wiki · review view</p>
+      <h1 id="repo-name">—</h1>
+      <p class="summary" id="repo-summary"></p>
+    </div>
+    <div class="controls">
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle color theme">
+        <span id="theme-label">Theme</span>
+      </button>
+    </div>
+  </header>
+
+  <section id="sec-tiles" aria-label="Summary">
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section id="sec-stack">
+    <div class="sec-head"><h2>Stack</h2></div>
+    <div class="stack" id="stack"></div>
+  </section>
+
+  <section id="sec-map">
+    <div class="sec-head"><h2>Map</h2><span class="count" id="map-count"></span></div>
+    <p class="sec-note">Where code lives. Every path is real — open it directly instead of searching.</p>
+    <div class="map-tools">
+      <input class="filter" id="map-filter" type="text" placeholder="Filter by area, path or purpose…" aria-label="Filter the map">
+    </div>
+    <div class="table-scroll">
+      <table class="map">
+        <thead><tr><th>Area</th><th>Key files</th><th>Purpose</th><th>Module</th></tr></thead>
+        <tbody id="map-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="sec-tasks">
+    <div class="sec-head"><h2>Where to start by task</h2></div>
+    <div class="tasks" id="tasks"></div>
+  </section>
+
+  <section id="sec-split">
+    <div class="split">
+      <div class="panel card graph-box">
+        <h3>Page graph</h3>
+        <p class="hint">How the wiki pages link to each other. Hover a page to trace its connections.</p>
+        <div id="graph"></div>
+      </div>
+      <div class="panel card">
+        <h3>Freshness</h3>
+        <p class="hint">Each page by how long since its <code>updated:</code> date and its <code>status:</code>.</p>
+        <div class="heat" id="heat"></div>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>fresh ≤ 30d</span>
+          <span><i style="background:var(--warn)"></i>aging ≤ 90d</span>
+          <span><i style="background:var(--crit)"></i>overdue / stale</span>
+          <span><i style="background:var(--draft)"></i>draft</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec-sources" hidden>
+    <div class="sec-head"><h2>Data sources</h2><span class="count" id="src-count"></span></div>
+    <p class="sec-note">External engines this repo connects to — from the cross-project catalog and the
+      repo's connection code. Connection shape and credential <em>names</em> only, never secrets.</p>
+    <div class="sources" id="sources"></div>
+  </section>
+
+  <section id="sec-modules">
+    <div class="sec-head"><h2>Modules</h2><span class="count" id="mod-count"></span></div>
+    <div class="modules" id="modules"></div>
+  </section>
+
+  <section id="sec-log">
+    <div class="sec-head"><h2>Activity</h2></div>
+    <p class="sec-note">From <code>log.md</code> — one entry per init / update / lint, newest last.</p>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <footer class="foot">
+    Generated from the <code>.llm-wiki/</code> Markdown canon · <span id="gen-date">—</span>.
+    Agents read the Markdown; this HTML view is for humans and is never loaded into an agent's context.
+    Regenerate with <code>/llm-wiki:view</code>.
+  </footer>
+</div>
+
+<script id="wiki-data" type="application/json">
+{
+  "repo": "tasks-api",
+  "generated": "2026-10-12",
+  "today": "2026-10-12",
+  "summary": "A small REST API for managing tasks. Express + TypeScript service backed by Postgres via Prisma.",
+  "stack": [
+    { "label": "Languages / runtime", "value": "TypeScript, Node 20 (ESM)" },
+    { "label": "Package manager", "value": "pnpm" },
+    { "label": "Run", "value": "pnpm dev" },
+    { "label": "Build", "value": "pnpm build" },
+    { "label": "Test", "value": "pnpm test" },
+    { "label": "Lint / format", "value": "pnpm lint · pnpm format" },
+    { "label": "Typecheck", "value": "pnpm typecheck" }
+  ],
+  "map": [
+    { "area": "HTTP API", "files": ["src/http/", "src/app.ts", "src/server.ts"], "purpose": "Express app, routes, controllers, middleware", "module": "http-api" },
+    { "area": "Data", "files": ["src/data/", "prisma/schema.prisma"], "purpose": "Prisma client, repositories, migrations", "module": "data" },
+    { "area": "Config", "files": ["src/config.ts"], "purpose": "Env parsing (zod), typed config", "module": null }
+  ],
+  "tasks": [
+    { "label": "Fix an endpoint bug", "targets": ["http-api", "src/http/tasks.controller.ts"] },
+    { "label": "Add an endpoint", "targets": ["recipes", "http-api"] },
+    { "label": "Change the schema / add a migration", "targets": ["recipes", "prisma/schema.prisma"] },
+    { "label": "Run / debug locally", "targets": ["recipes"] }
+  ],
+  "pages": [
+    { "id": "index", "title": "Index", "kind": "index", "updated": "2026-09-23", "status": "current", "covers": ["overview", "navigation"] },
+    { "id": "architecture", "title": "Architecture", "kind": "page", "updated": "2026-09-23", "status": "current", "covers": ["architecture"] },
+    { "id": "conventions", "title": "Conventions", "kind": "page", "updated": "2026-09-23", "status": "current", "covers": ["conventions", "patterns"] },
+    { "id": "glossary", "title": "Glossary", "kind": "page", "updated": "2026-09-23", "status": "current", "covers": ["glossary", "domain"] },
+    { "id": "recipes", "title": "Recipes", "kind": "page", "updated": "2026-09-23", "status": "current", "covers": ["recipes", "how-to"] },
+    { "id": "http-api", "title": "HTTP API", "kind": "module", "updated": "2026-09-23", "status": "current", "covers": ["http", "routes", "controllers"], "purpose": "The Express layer: routing, request validation, response shaping, error handling.", "files": ["src/server.ts", "src/app.ts", "src/http/tasks.routes.ts", "src/http/tasks.controller.ts", "src/http/error.middleware.ts"] },
+    { "id": "data", "title": "Data", "kind": "module", "updated": "2026-09-23", "status": "current", "covers": ["data", "prisma", "persistence"], "purpose": "Persistence: Prisma over Postgres. Repositories are the only code that touches the Prisma client.", "files": ["prisma/schema.prisma", "prisma/migrations/", "src/data/client.ts", "src/data/tasks.repository.ts"] },
+    { "id": "log", "title": "Log", "kind": "log" }
+  ],
+  "links": [
+    { "from": "index", "to": "http-api" },
+    { "from": "index", "to": "data" },
+    { "from": "index", "to": "recipes" },
+    { "from": "index", "to": "architecture" },
+    { "from": "index", "to": "conventions" },
+    { "from": "index", "to": "glossary" },
+    { "from": "index", "to": "log" },
+    { "from": "architecture", "to": "http-api" },
+    { "from": "architecture", "to": "data" },
+    { "from": "architecture", "to": "conventions" },
+    { "from": "glossary", "to": "data" },
+    { "from": "http-api", "to": "data" },
+    { "from": "http-api", "to": "architecture" },
+    { "from": "http-api", "to": "conventions" },
+    { "from": "http-api", "to": "recipes" },
+    { "from": "data", "to": "http-api" },
+    { "from": "data", "to": "architecture" },
+    { "from": "data", "to": "glossary" },
+    { "from": "data", "to": "recipes" }
+  ],
+  "log": [
+    { "date": "2026-09-23", "op": "init", "summary": "scanned tasks-api (Express+TS, pnpm, Prisma); created index, architecture, conventions, recipes, glossary + http-api and data module pages" }
+  ],
+  "dataSources": [
+    { "name": "tasks-db", "engine": "PostgreSQL", "connectVia": "Prisma (DATABASE_URL)", "auth": "User + password", "notes": "env: DATABASE_URL (name only)" }
+  ]
+}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Theme toggle (per-viewer convenience; falls back cleanly) ----
+  var root = document.documentElement;
+  var tLabel = document.getElementById("theme-label");
+  function systemDark() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function currentTheme() {
+    return root.getAttribute("data-theme") || (systemDark() ? "dark" : "light");
+  }
+  function applyTheme(mode) {
+    root.setAttribute("data-theme", mode);
+    tLabel.textContent = mode === "dark" ? "Light" : "Dark";
+    try { localStorage.setItem("llmwiki-view-theme", mode); } catch (e) {}
+  }
+  try {
+    var saved = localStorage.getItem("llmwiki-view-theme");
+    if (saved === "dark" || saved === "light") applyTheme(saved);
+    else tLabel.textContent = systemDark() ? "Light" : "Dark";
+  } catch (e) { tLabel.textContent = "Dark"; }
+  document.getElementById("theme-toggle").addEventListener("click", function () {
+    applyTheme(currentTheme() === "dark" ? "light" : "dark");
+  });
+
+  // ---- Load data ----
+  var data;
+  try {
+    data = JSON.parse(document.getElementById("wiki-data").textContent);
+  } catch (e) {
+    document.getElementById("repo-name").textContent = "Could not read wiki data";
+    return;
+  }
+
+  var byId = {};
+  (data.pages || []).forEach(function (p) { byId[p.id] = p; });
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function daysBetween(a, b) {
+    var ms = new Date(b + "T00:00:00").getTime() - new Date(a + "T00:00:00").getTime();
+    return Math.max(0, Math.round(ms / 86400000));
+  }
+  function freshnessClass(page, today) {
+    if (page.status === "draft") return "draft";
+    if (page.status === "stale") return "stale";
+    if (!page.updated) return "draft";
+    var age = daysBetween(page.updated, today);
+    if (age <= 30) return "fresh";
+    if (age <= 90) return "aging";
+    return "overdue";
+  }
+
+  var today = data.today || new Date().toISOString().slice(0, 10);
+
+  // ---- Header ----
+  document.getElementById("repo-name").textContent = data.repo || "Knowledge base";
+  document.getElementById("repo-summary").textContent = data.summary || "";
+  document.getElementById("gen-date").textContent = data.generated || today;
+
+  // ---- Tiles ----
+  var pagesWithFm = (data.pages || []).filter(function (p) { return p.kind !== "log"; });
+  var modCount = (data.pages || []).filter(function (p) { return p.kind === "module"; }).length;
+  var needsAttention = pagesWithFm.filter(function (p) {
+    var f = freshnessClass(p, today);
+    return f === "overdue" || f === "stale" || f === "draft";
+  }).length;
+  var lastUpdated = pagesWithFm.map(function (p) { return p.updated; }).filter(Boolean).sort().pop() || "—";
+  var lastLog = (data.log || [])[(data.log || []).length - 1];
+
+  var tiles = [
+    { k: "Pages", v: String(pagesWithFm.length), sub: (data.links || []).length + " cross-links" },
+    { k: "Modules", v: String(modCount), sub: "subsystem pages" },
+    { k: "Last updated", v: lastUpdated, sub: lastUpdated === "—" ? "" : daysBetween(lastUpdated, today) + " days ago" },
+    { k: "Needs attention", v: String(needsAttention), sub: needsAttention === 0 ? "all current" : "draft / stale / overdue" }
+  ];
+  var tilesBox = document.getElementById("tiles");
+  tiles.forEach(function (t) {
+    var c = el("div", "tile card");
+    c.appendChild(el("span", "k", t.k));
+    c.appendChild(el("span", "v", t.v));
+    if (t.sub) c.appendChild(el("span", "sub", t.sub));
+    tilesBox.appendChild(c);
+  });
+
+  // ---- Stack ----
+  var stackBox = document.getElementById("stack");
+  (data.stack || []).forEach(function (s) {
+    var chip = el("span", "chip");
+    chip.appendChild(el("b", null, s.label));
+    var code = el("code", null, s.value);
+    chip.appendChild(code);
+    stackBox.appendChild(chip);
+  });
+
+  // ---- Map ----
+  var mapBody = document.getElementById("map-body");
+  function renderMap(filter) {
+    mapBody.innerHTML = "";
+    var q = (filter || "").trim().toLowerCase();
+    var rows = (data.map || []).filter(function (r) {
+      if (!q) return true;
+      var hay = (r.area + " " + (r.files || []).join(" ") + " " + r.purpose).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+    rows.forEach(function (r) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "area", r.area));
+      var tdFiles = el("td");
+      var paths = el("div", "paths");
+      (r.files || []).forEach(function (f) { paths.appendChild(el("code", "path", f)); });
+      tdFiles.appendChild(paths);
+      tr.appendChild(tdFiles);
+      tr.appendChild(el("td", null, r.purpose));
+      var tdMore = el("td", "more");
+      if (r.module && byId[r.module]) {
+        var a = el("a", null, r.module);
+        a.href = "#mod-" + r.module;
+        a.addEventListener("click", function () { flashModule(r.module); });
+        tdMore.appendChild(a);
+      } else {
+        tdMore.appendChild(el("span", "dash", "—"));
+      }
+      tr.appendChild(tdMore);
+      mapBody.appendChild(tr);
+    });
+    document.getElementById("map-count").textContent = rows.length + (q ? " of " + (data.map || []).length : "") + " areas";
+  }
+  renderMap("");
+  document.getElementById("map-filter").addEventListener("input", function (e) { renderMap(e.target.value); });
+
+  // ---- Task cards ----
+  var tasksBox = document.getElementById("tasks");
+  (data.tasks || []).forEach(function (t) {
+    var c = el("div", "task card");
+    c.appendChild(el("span", "label", t.label));
+    var tg = el("div", "targets");
+    (t.targets || []).forEach(function (target) {
+      if (byId[target] && byId[target].kind === "module") {
+        var a = el("a", null, target);
+        a.href = "#mod-" + target;
+        a.addEventListener("click", function () { flashModule(target); });
+        tg.appendChild(a);
+      } else {
+        tg.appendChild(el("code", "path", target));
+      }
+    });
+    c.appendChild(tg);
+    tasksBox.appendChild(c);
+  });
+
+  // ---- Link graph (deterministic radial layout, inline SVG) ----
+  (function buildGraph() {
+    var nodes = (data.pages || []).filter(function (p) { return p.kind !== "log" ? true : true; }); // include all
+    var W = 560, H = 440, cx = W / 2, cy = H / 2, R = 150;
+    var short = {
+      "index": "index", "architecture": "arch", "conventions": "conv",
+      "glossary": "glossary", "recipes": "recipes", "log": "log"
+    };
+    var center = nodes.filter(function (n) { return n.id === "index"; })[0];
+    var ring = nodes.filter(function (n) { return n.id !== "index"; });
+    // group modules first for a tidy arc
+    ring.sort(function (a, b) {
+      var am = a.kind === "module" ? 0 : 1, bm = b.kind === "module" ? 0 : 1;
+      return am - bm;
+    });
+    var pos = {};
+    if (center) pos["index"] = { x: cx, y: cy };
+    ring.forEach(function (n, i) {
+      var ang = (-Math.PI / 2) + (i / ring.length) * Math.PI * 2;
+      pos[n.id] = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+    });
+
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "graph");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Graph of links between wiki pages");
+
+    var edgesG = document.createElementNS(svgNS, "g");
+    var nodesG = document.createElementNS(svgNS, "g");
+    svg.appendChild(edgesG);
+    svg.appendChild(nodesG);
+
+    var edgeEls = [];
+    (data.links || []).forEach(function (lk) {
+      var a = pos[lk.from], b = pos[lk.to];
+      if (!a || !b) return;
+      var line = document.createElementNS(svgNS, "line");
+      line.setAttribute("class", "edge");
+      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+      line.dataset.from = lk.from; line.dataset.to = lk.to;
+      edgesG.appendChild(line);
+      edgeEls.push(line);
+    });
+
+    nodes.forEach(function (n) {
+      var p = pos[n.id];
+      if (!p) return;
+      var g = document.createElementNS(svgNS, "g");
+      var kind = n.id === "index" ? "index" : (n.kind === "module" ? "module" : "page");
+      g.setAttribute("class", "node " + kind);
+      g.dataset.id = n.id;
+      var c = document.createElementNS(svgNS, "circle");
+      c.setAttribute("cx", p.x); c.setAttribute("cy", p.y);
+      c.setAttribute("r", n.id === "index" ? 26 : 20);
+      g.appendChild(c);
+      var label = short[n.id] || n.id;
+      var t = document.createElementNS(svgNS, "text");
+      t.setAttribute("x", p.x); t.setAttribute("y", p.y + 3);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = label;
+      g.appendChild(t);
+      if (n.kind === "module") {
+        var s = document.createElementNS(svgNS, "text");
+        s.setAttribute("x", p.x); s.setAttribute("y", p.y + 15);
+        s.setAttribute("text-anchor", "middle");
+        s.setAttribute("class", "sub");
+        s.textContent = "module";
+        g.appendChild(s);
+      }
+      g.addEventListener("mouseenter", function () { lightUp(n.id); });
+      g.addEventListener("mouseleave", clearLight);
+      nodesG.appendChild(g);
+    });
+
+    function lightUp(id) {
+      svg.classList.add("has-active");
+      var connected = {};
+      connected[id] = true;
+      edgeEls.forEach(function (line) {
+        if (line.dataset.from === id || line.dataset.to === id) {
+          line.classList.add("lit");
+          connected[line.dataset.from] = true;
+          connected[line.dataset.to] = true;
+        } else {
+          line.classList.remove("lit");
+        }
+      });
+      Array.prototype.forEach.call(nodesG.children, function (g) {
+        g.classList.toggle("lit", !!connected[g.dataset.id]);
+      });
+    }
+    function clearLight() {
+      svg.classList.remove("has-active");
+      edgeEls.forEach(function (line) { line.classList.remove("lit"); });
+      Array.prototype.forEach.call(nodesG.children, function (g) { g.classList.remove("lit"); });
+    }
+
+    document.getElementById("graph").appendChild(svg);
+  })();
+
+  // ---- Freshness heatmap ----
+  var heat = document.getElementById("heat");
+  pagesWithFm.slice().sort(function (a, b) {
+    return (a.updated || "").localeCompare(b.updated || "");
+  }).forEach(function (p) {
+    var cls = freshnessClass(p, today);
+    var row = el("div", "row " + cls);
+    row.appendChild(el("span", "name", p.title + (p.kind === "module" ? "  ·  module" : "")));
+    var age = p.updated ? daysBetween(p.updated, today) + "d" : "—";
+    var ageText = p.status === "draft" ? "draft" : (p.status === "stale" ? "stale · " + age : age);
+    row.appendChild(el("span", "age", ageText));
+    heat.appendChild(row);
+  });
+
+  // ---- Module cards ----
+  var modBox = document.getElementById("modules");
+  var mods = (data.pages || []).filter(function (p) { return p.kind === "module"; });
+  document.getElementById("mod-count").textContent = mods.length + " pages";
+  mods.forEach(function (m) {
+    var c = el("div", "module card");
+    c.id = "mod-" + m.id;
+    c.appendChild(el("h3", null, m.title));
+    if (m.covers) c.appendChild(el("div", "cover", m.covers.join(" · ")));
+    if (m.purpose) c.appendChild(el("p", "p", m.purpose));
+    if (m.files && m.files.length) {
+      var files = el("div", "files");
+      m.files.forEach(function (f) {
+        var line = el("div", "f");
+        line.appendChild(el("span", "dot", "›"));
+        line.appendChild(el("code", null, f));
+        files.appendChild(line);
+      });
+      c.appendChild(files);
+    }
+    modBox.appendChild(c);
+  });
+
+  function flashModule(id) {
+    var node = document.getElementById("mod-" + id);
+    if (!node) return;
+    node.classList.remove("flash");
+    void node.offsetWidth;
+    node.classList.add("flash");
+  }
+
+  // ---- Data sources (optional) ----
+  var sources = data.dataSources || [];
+  if (sources.length) {
+    var engineColor = {
+      "sql server": "#4f6bed", "mssql": "#4f6bed",
+      "oracle": "#e0603a",
+      "postgresql": "#2f7bbf", "postgres": "#2f7bbf",
+      "sas": "#13a10e",
+      "mysql": "#c99a2e", "mariadb": "#c99a2e"
+    };
+    var srcBox = document.getElementById("sources");
+    document.getElementById("src-count").textContent = sources.length + (sources.length === 1 ? " engine" : " engines");
+    sources.forEach(function (s) {
+      var c = el("div", "source card");
+      var dot = el("span", "dot");
+      dot.style.background = engineColor[(s.engine || "").toLowerCase()] || "var(--accent)";
+      c.appendChild(dot);
+      c.appendChild(el("span", "name", s.name || "—"));
+      c.appendChild(el("span", "engine", s.engine || ""));
+      if (s.connectVia) c.appendChild(el("span", "meta2", s.connectVia));
+      var authBits = [];
+      if (s.auth) authBits.push(s.auth);
+      if (s.notes) authBits.push(s.notes);
+      if (authBits.length) c.appendChild(el("span", "auth", authBits.join("  ·  ")));
+      srcBox.appendChild(c);
+    });
+    document.getElementById("sec-sources").hidden = false;
+  }
+
+  // ---- Log timeline ----
+  var tl = document.getElementById("timeline");
+  (data.log || []).forEach(function (e) {
+    var row = el("div", "entry " + (e.op || "update"));
+    row.appendChild(el("span", "marker"));
+    var meta = el("div", "meta");
+    meta.appendChild(el("span", "op", (e.op || "update")));
+    meta.appendChild(el("span", "date", e.date || ""));
+    row.appendChild(meta);
+    row.appendChild(el("div", "text", e.summary || ""));
+    tl.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>

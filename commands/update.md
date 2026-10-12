@@ -58,8 +58,13 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
 6. **Refresh pointer blocks if needed.** Only if the wiki's entry points changed; edit inside the
    `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block only, never the user's surrounding content.
 
-7. **Report** what you updated, any data-source catalog entries added or changed, and anything you
-   chose not to touch.
+7. **Refresh the HTML view if present.** If `.llm-wiki/view/index.html` exists (the human-only review
+   dashboard), offer to regenerate it with `/llm-wiki:view` so it reflects the updated canon — in diff
+   mode it can highlight exactly the pages this update changed. Don't regenerate unprompted if there's
+   no view yet.
+
+8. **Report** what you updated, any data-source catalog entries added or changed, whether the view was
+   refreshed, and anything you chose not to touch.
 
 ## Principles
 
