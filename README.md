@@ -12,13 +12,14 @@ carries a small compiled map under `.llm-wiki/` that the agent reads first.
 
 - Installs a `.llm-wiki/` knowledge base into any repo: a **map** of where code lives, an
   **architecture** overview, **conventions**, a **glossary**, **recipes** for common tasks, per-module
-  pages, and an append-only **log**.
+  pages, an optional **data-sources** page, and an append-only **log**.
 - Generates root pointer files so every tool uses the same knowledge base:
   - `CLAUDE.md` — Claude Code
   - `AGENTS.md` — Codex and other agents
   - `.github/copilot-instructions.md` — GitHub Copilot
 - Bundles an always-on **skill** that makes agents read the wiki before searching and keep it current
-  after edits.
+  after edits, plus a **`data-sources`** skill that recognizes the external data a repo connects to —
+  in any repo, wiki or not — and never stores a secret.
 
 ## Optimized for Python, Node.js, T-SQL, PostgreSQL & R (plus Slurm)
 
@@ -137,6 +138,32 @@ The index says *where* code is, so the agent reads a couple of targeted files in
 whole tree. Module pages give entry points and gotchas; recipes encode how to do common tasks once.
 See [skills/llm-wiki/references/token-efficiency.md](skills/llm-wiki/references/token-efficiency.md).
 
+## Data sources (two tiers)
+
+Most repos read or write data that lives somewhere else: a SQL Server, a warehouse account, an
+`s3://` bucket, a `\\server\share`, a Kafka cluster, a named API. A separate **`data-sources`**
+skill recognizes those connections — relational, warehouse, object store and share, embedded,
+queue/stream, API/SFTP, SAS — and fires in **any** repo, with or without a `.llm-wiki/`.
+
+What it finds is recorded in two places, joined on the source's **Name**:
+
+| | `~/.claude/llm-wiki/data-sources.md` | `.llm-wiki/data-sources.md` |
+|---|---|---|
+| Answers | *how do I connect to it?* | *what does **this** repo do with it?* |
+| Scope | user-global, **never committed** | one repo, committed wiki canon (optional) |
+| Holds | engine, connect-via, driver/DSN, auth model, credential env-var **names**, which repos use it | the code paths that touch it, direction, the objects/prefixes/topics used, repo gotchas, dev substitutes |
+
+**Never a secret, in either** — only the *names* of the env vars or secret-store entries that supply
+credentials (a presigned or SAS URL *is* a secret). A credential found inlined in code is reported,
+not copied. `/llm-wiki:lint` checks both tiers for leaks and for drift between them.
+
+A repo that connects to nothing gets no page. See
+[skills/llm-wiki/references/data-sources.md](skills/llm-wiki/references/data-sources.md) for the
+record formats and [data-source-detection.md](skills/llm-wiki/references/data-source-detection.md)
+for the detection signatures and the threshold that keeps telemetry hosts and package registries out
+of the catalog. Worked example:
+[examples/python-analytics/.llm-wiki/data-sources.md](examples/python-analytics/.llm-wiki/data-sources.md).
+
 ## Reviewing the wiki (HTML view)
 
 The `.llm-wiki/` pages are **Markdown on purpose** — that's what keeps them cheap for an agent to read
@@ -186,6 +213,7 @@ Run inside the repo you want to document:
 | `/llm-wiki:init` | Scan the repo and bootstrap `.llm-wiki/` + the three pointer files |
 | `/llm-wiki:update` | Refresh affected pages after code changes; append a log entry |
 | `/llm-wiki:lint` | Health-check for stale claims, orphan pages, broken links, drift |
+| `/llm-wiki:upgrade` | Retrofit an existing `.llm-wiki/` to the current structural contract (see [docs/upgrading.md](docs/upgrading.md)) |
 | `/llm-wiki:view` | Build a human-only HTML review dashboard (`.llm-wiki/view/index.html`) from the Markdown |
 
 The bundled `llm-wiki` skill also triggers automatically when you work in a repo that already has a
@@ -302,8 +330,11 @@ opencode, and a growing set of agents. Same content, pointing into the same `.ll
 
 ```
 .claude-plugin/   plugin.json + marketplace.json
-skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks, view layer)
-commands/         init, update, lint, view
+skills/llm-wiki/  SKILL.md + references (page formats, token efficiency, stacks, view layer,
+                  wiki contract (the structural levels :upgrade retrofits to),
+                  data sources + data-source detection — these two are shared by both skills)
+skills/data-sources/  SKILL.md (recognizes data sources in any repo, wiki or not)
+commands/         init, update, lint, upgrade, view
 templates/        wiki/ (pages copied into .llm-wiki/) + pointers/ (root files)
                   + view/ (the HTML review-dashboard template)
                   + copilot-prompts/ (/llm-wiki-* prompt files) + copilot-instructions/ (path-scoped: T-SQL, PostgreSQL, R, Slurm)
@@ -311,6 +342,7 @@ examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/
                   + tsql-database/ + tsql-warehouse/ + postgres-database/ + r-analysis/
                   + hpc-slurm/ (worked reference wikis)
 scripts/          install-copilot.sh / .ps1 (install the Copilot integration without Claude Code)
+docs/             html-view-layer.md (why the view exists) + upgrading.md (retrofitting old wikis)
 ```
 
 Pointer files are written as a delimited `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block, so

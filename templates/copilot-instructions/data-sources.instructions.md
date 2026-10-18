@@ -15,6 +15,11 @@ source, use the documented `cfgname` from `sascfg_personal.py` and let saspy rea
 here, tell the user so it can be added to the catalog (via `/llm-wiki:init` or `/llm-wiki:update` in
 Claude Code).
 
+If the workspace has a **`.llm-wiki/data-sources.md`** page, read it too: it lists which of *this*
+repo's code touches which source, in which direction, and the repo-specific gotchas. This file covers
+*how* to connect; that page covers *what this repo does* with each source. Neither ever holds a
+secret.
+
 This is a **user-global** instruction file (it applies in every workspace) and is **VS Code-only** —
 github.com Copilot and other editors read committed repo files only.
 

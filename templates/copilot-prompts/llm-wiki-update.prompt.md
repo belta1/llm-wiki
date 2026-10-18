@@ -25,12 +25,18 @@ the `llm-wiki-init` prompt instead.)
    modules. With **Slurm**: new/removed job scripts, changed `#SBATCH` resources or `module load`
    versions, a changed dependency chain. Skip formatting/comment-only edits.
 3. **Update the affected pages** — `index.md` rows, the relevant `modules/<name>.md` (add a new one for
-   any significant new subsystem), and `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md`
+   any significant new subsystem), and `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md`/`data-sources.md`
    where the change touched them. Bump each edited page's `updated:` date.
-3b. **Data sources** — if the change added or altered a database connection (a named server/DSN,
-   driver, or auth model), note it so it can be recorded in the cross-project data-source catalog
-   (`~/.claude/llm-wiki/data-sources.md`): engine, connect-via, driver, auth model, and credential
-   env-var **names** only — **never** inline or record a password/token. Flag any secret you find
+3b. **Data sources** — if the change added or altered a connection to anything outside the repo (a
+   database server/DSN, warehouse account, object-store bucket, network share, broker, named API or
+   SFTP host — or a changed driver, auth model, or set of objects read/written):
+   - update **`data-sources.md`** — its rows, code paths, direction and objects — creating it from
+     the plugin's `templates/wiki/data-sources.md` if the repo just gained its first external source
+     (then add the `index.md` Map row), and bump its `updated:` date like any other page;
+   - note the connection facts (engine, connect-via, driver, auth model, credential env-var **names**
+     only) so the user can record them in the cross-project catalog
+     `~/.claude/llm-wiki/data-sources.md`.
+   **Never** inline or record a password, token, key or presigned/SAS URL. Flag any secret you find
    hard-coded in a connection string.
 4. **Repair cross-links** invalidated by moves/renames/deletes.
 5. **Append** a `log.md` entry: `## [<today>] update | <short summary>`.

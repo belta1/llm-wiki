@@ -37,11 +37,21 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
      the `.refactorlog` — if one doesn't, flag it to the user. For PostgreSQL the same applies to
      functions and views (arguments, `RETURNS` shape, `ERRCODE`s raised, grants/RLS); a new
      re-runnable script that isn't idempotent, or one missing from the run list, should be flagged.
-   - **Data-source changes are substantive:** a new or changed database connection (a new server/DSN,
-     a changed driver or auth model) → **upsert** the user-global catalog
-     `~/.claude/llm-wiki/data-sources.md` (match by host/DSN name; record engine / connect-via / driver
-     / auth / credential env-var **names** only; never a secret). See
-     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`.
+   - **Data-source changes are substantive:** a new or changed connection to anything outside the
+     repo — a database server/DSN, a warehouse account, an object-store bucket or network share, an
+     embedded store, a queue/stream broker, a named API or SFTP host — or a changed driver, auth
+     model, or set of objects read/written. Update **both tiers**:
+     - **upsert** the user-global catalog `~/.claude/llm-wiki/data-sources.md` (match by
+       host/DSN/account name; record engine / connect-via / driver / auth / credential env-var
+       **names** only; append this repo to `Used by:`; never a secret);
+     - update `.llm-wiki/data-sources.md` — its rows, code paths, direction and objects — creating it
+       from `${CLAUDE_PLUGIN_ROOT}/templates/wiki/data-sources.md` if the repo just gained its first
+       external source (then add the `index.md` Map row and the "Also see" link), and bumping its
+       `updated:` / `status:` like any other page. Also refresh the **Data sources used** table on
+       any affected `modules/<name>.md`.
+     Apply the threshold and keep one entry per source — see
+     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-source-detection.md` and
+     `.../data-sources.md`.
 
 3. **Update the affected pages:**
    - `index.md` — fix rows whose key files/paths/purpose changed; add rows for new areas.

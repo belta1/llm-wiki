@@ -27,11 +27,14 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` fi
    - Every page's YAML frontmatter — `updated`, `status`, `covers`.
    - The cross-links between pages (the relative `*.md` links in each page's body).
    - `log.md` — each `## [YYYY-MM-DD] <op> | <summary>` entry.
-   - **Data sources this repo uses** — from the repo's connection code (pyodbc / SQLAlchemy /
-     `DBI::dbConnect` / `saspy.SASsession`, `Server=`/`DSN=` strings, `pg_service`, `sascfg_personal.py`)
-     and, for Claude, the cross-project catalog `~/.claude/llm-wiki/data-sources.md` filtered to the
-     sources this repo touches. Record engine (SQL Server / Oracle / PostgreSQL / SAS / …),
-     connect-via, auth model, and credential **names** only — **never a secret value**.
+   - **Data sources this repo uses** — read `data-sources.md` **first** if the wiki has one: it is
+     the authoritative repo-scoped list (Name, Engine, Used by, Direction, Objects, Catalog). Only if
+     that page is absent, fall back to scanning the repo's connection code (pyodbc / SQLAlchemy /
+     `DBI::dbConnect` / `saspy.SASsession` / `boto3` / `snowflake.connector` / `duckdb`, `Server=`/
+     `DSN=`/`s3://` strings, UNC paths, `pg_service`, `sascfg_personal.py`). Then, for Claude, join
+     each source by **Name** to the cross-project catalog `~/.claude/llm-wiki/data-sources.md` for its
+     connect-via and auth model. Record engine, connect-via, auth model, and credential **names**
+     only — **never a secret value**.
 
 2. **Build the data object** matching the shape in `references/view-layer.md`: `repo`, `summary`,
    `generated` (today's date), `today`, `stack[]`, `map[]`, `tasks[]`, `pages[]` (each with `id`,

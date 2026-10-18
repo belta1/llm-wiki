@@ -382,10 +382,12 @@ Do **not** tie storage to "web". Detect it on its own and document only what exi
 **not** a signal of a web app or a database.
 
 Whenever you detect a connection to a **named** data source (a SQL Server host, an ODBC DSN, an
-Oracle service, a Postgres service) — via `pyodbc` / SQLAlchemy `create_engine` / `DBI::dbConnect` /
-a `Server=`/`Data Source=`/`DSN=` string / `pg_service.conf` / `tnsnames.ora` — record it once in the
-cross-project [data-source catalog](data-sources.md) (engine, driver, auth model, credential env-var
-**names** only — never a secret). That catalog is user-global, not part of the repo's `.llm-wiki/`.
+Oracle or Postgres service, a warehouse account, an object-store bucket, a network share, a broker, a
+named data API) — see [data-source-detection.md](data-source-detection.md) for the signatures and the
+threshold — record it once in the cross-project [data-source catalog](data-sources.md) (engine,
+driver, auth model, credential env-var **names** only — never a secret). That catalog is user-global,
+not part of the repo's `.llm-wiki/`; the repo-scoped counterpart, listing which of *this* repo's code
+touches which source, is the optional `.llm-wiki/data-sources.md` page.
 
 ---
 

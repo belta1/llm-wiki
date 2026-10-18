@@ -26,12 +26,14 @@ pages** — they are the source of truth that AI agents read. The HTML view is *
    - `pages`: `[{ "id", "title", "kind": "index|page|module|log", "updated", "status", "covers": [..],
      "purpose"?, "files"? }]` — use the module's base filename as its `id` (e.g. `http-api`).
    - `links`: `[{ "from": "<id>", "to": "<id>" }]`
-   - `log`: `[{ "date", "op": "init|update|lint", "summary" }]`
-   - `dataSources`: `[{ "name", "engine": "SQL Server|Oracle|PostgreSQL|SAS|…", "connectVia", "auth",
-     "notes" }]` — the external engines this repo connects to (from its connection code:
-     pyodbc / SQLAlchemy / `DBI::dbConnect` / `saspy.SASsession`, `Server=`/`DSN=`, `pg_service`,
-     `sascfg_personal.py`). Connection shape and credential **names** only — **never a secret**. Omit
-     if none.
+   - `log`: `[{ "date", "op": "init|update|lint|upgrade", "summary" }]`
+   - `dataSources`: `[{ "name", "engine": "SQL Server|Oracle|PostgreSQL|SAS|Snowflake|S3|…",
+     "connectVia", "auth", "notes" }]` — the external sources this repo connects to. Read the wiki's
+     own `data-sources.md` **first** if it has one (that page is the authoritative repo-scoped list);
+     only if it's absent, scan the connection code (pyodbc / SQLAlchemy / `DBI::dbConnect` /
+     `saspy.SASsession` / `boto3` / `snowflake.connector` / `duckdb`, `Server=`/`DSN=`/`s3://`, UNC
+     paths, `pg_service`, `sascfg_personal.py`). Connection shape and credential **names** only —
+     **never a secret**. Omit if none.
 
 3. **Write `.llm-wiki/view/index.html`.** If this repo already has a viewer template at
    `.llm-wiki/view/index.html`, replace only the JSON between its

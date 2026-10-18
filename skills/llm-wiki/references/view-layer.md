@@ -55,7 +55,7 @@ directly or in VS Code's Simple Browser.
     "files": ["src/app.ts"]           // modules only
   }],
   "links":  [{ "from": "index", "to": "http-api" }],   // by page id
-  "log":    [{ "date": "2026-09-23", "op": "init", "summary": "…" }],
+  "log":    [{ "date": "2026-09-23", "op": "init|update|lint|upgrade", "summary": "…" }],
   "dataSources": [{                                    // optional; omit if the repo connects to nothing
     "name": "tasks-db",
     "engine": "PostgreSQL",                            // SQL Server | Oracle | PostgreSQL | SAS | …
@@ -71,10 +71,13 @@ directly or in VS Code's Simple Browser.
 - Freshness color is computed from `status` and the age of `updated:` vs `today`: `draft` and `stale`
   always flag; otherwise `≤30d` fresh, `≤90d` aging, older overdue.
 - `dataSources` renders a panel (hidden when empty) of the external engines the repo connects to —
-  SQL Server, Oracle, PostgreSQL, SAS (saspy) and others, each with an engine-colored dot. It carries
-  connection shape and credential **names** only; never a secret value. The generator fills it from the
-  repo's connection code and (for Claude) the cross-project catalog
-  [`data-sources.md`](data-sources.md), filtered to the sources this repo uses.
+  SQL Server, Oracle, PostgreSQL, SAS (saspy), warehouses, object stores and shares, brokers and
+  others, each with an engine-colored dot (engines outside the template's color map fall back to the
+  accent color — not a bug). It carries connection shape and credential **names** only; never a secret
+  value. The generator's primary source is the wiki's own `data-sources.md` page when it exists —
+  that page is the authoritative repo-scoped list — falling back to a scan of the repo's connection
+  code; it then joins by **Name** to the cross-project catalog
+  [`data-sources.md`](data-sources.md) for `connectVia` and `auth`.
 
 ## Per-tool review
 

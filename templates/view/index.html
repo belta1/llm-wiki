@@ -227,15 +227,17 @@
   .timeline::before { content: ""; position: absolute; left: 7px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
   .entry { position: relative; padding: 4px 0 16px; }
   .entry:last-child { padding-bottom: 0; }
-  .entry .marker { position: absolute; left: -26px; top: 6px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--bg); }
+  .entry .marker { position: absolute; left: -26px; top: 6px; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--bg); background: var(--muted); }
   .entry.init .marker { background: var(--accent); }
   .entry.update .marker { background: var(--ok); }
   .entry.lint .marker { background: var(--warn); }
+  .entry.upgrade .marker { background: var(--draft); }
   .entry .meta { font-family: var(--mono); font-size: 11.5px; display: flex; gap: 8px; align-items: center; margin-bottom: 3px; }
-  .entry .op { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .entry .op { text-transform: uppercase; letter-spacing: .06em; font-weight: 600; color: var(--muted); }
   .entry.init .op { color: var(--accent); }
   .entry.update .op { color: var(--ok); }
   .entry.lint .op { color: var(--warn); }
+  .entry.upgrade .op { color: var(--draft); }
   .entry .date { color: var(--faint); }
   .entry .text { font-size: 13.5px; color: var(--fg); }
 
@@ -342,7 +344,7 @@
 
   <section id="sec-log">
     <div class="sec-head"><h2>Activity</h2></div>
-    <p class="sec-note">From <code>log.md</code> — one entry per init / update / lint, newest last.</p>
+    <p class="sec-note">From <code>log.md</code> &mdash; one entry per init / update / lint / upgrade, newest last.</p>
     <div class="timeline" id="timeline"></div>
   </section>
 

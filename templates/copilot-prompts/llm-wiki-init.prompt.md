@@ -65,14 +65,26 @@ doesn't exist yet, create it.
   script / DBA repo**, **data warehouse / SSIS ETL**, **PostgreSQL psql script repo**, **R package /
   analysis (targets) / Shiny app / Quarto reports**, **HPC batch pipeline on Slurm**. Shape the pages
   to what the repo *actually is*.
-- **Data sources** — when you find a connection to a named data source (pyodbc / SQLAlchemy
-  `create_engine` / `DBI::dbConnect` / `saspy.SASsession`, a `Server=`/`Data Source=`/`DSN=` string,
-  `pg_service.conf`, `tnsnames.ora`, `sascfg_personal.py` or a `*.sas` `libname`/`signon`), note it so
-  it can be recorded in the cross-project data-source catalog (`~/.claude/llm-wiki/data-sources.md`):
-  engine (**SQL Server, Oracle, PostgreSQL, SAS**, …), connect-via, driver/cfgname, auth model, and
-  credential env-var / authinfo-key **names** only — **never** a password/token. Flag any secret
-  hard-coded in a connection string. (This catalog is user-global, not part of the repo's
-  `.llm-wiki/`.)
+- **Data sources** — when you find a connection to data outside the repo, across every class:
+  relational (pyodbc / SQLAlchemy `create_engine` / `DBI::dbConnect` / `psycopg` / `oracledb`),
+  warehouses (`snowflake.connector`, `pandas_gbq`, `databricks.sql`, `redshift_connector`, dbt
+  `profiles.yml`), object stores and network shares (`boto3.client("s3")`, `s3://`, `adlfs`,
+  `gcsfs`, `pd.read_parquet`/`read_excel` over a UNC or mounted path, SharePoint), local/embedded
+  (`duckdb.connect`, `sqlite3.connect`), caches/queues/streams (`redis.Redis`, `pymongo.MongoClient`,
+  `KafkaConsumer`, `pika`), named APIs and SFTP (`httpx.Client(base_url=)`, `paramiko`, `ftplib`), and
+  SAS (`saspy.SASsession`, `sascfg_personal.py`, `*.sas` `libname`/`signon`) — plus
+  `Server=`/`Data Source=`/`DSN=` strings and `pg_service.conf` / `odbc.ini` / `tnsnames.ora`.
+  Only count a source that is **external & named, durable & likely shared, and load-bearing**: skip
+  telemetry hosts, package registries, `localhost`, temp files and repo-relative fixtures. Keep **one
+  entry per source**, never per table/file/topic. Record it in two places:
+  - **`.llm-wiki/data-sources.md`** (create it from the template only if you found at least one
+    source) — name, engine, the real code paths that touch it, direction, and the
+    objects/prefixes/topics used, plus repo gotchas. Then add the matching **Map** row to `index.md`.
+  - the cross-project catalog `~/.claude/llm-wiki/data-sources.md` — note engine, connect-via,
+    driver/cfgname, auth model, and credential env-var / authinfo-key **names** only, so the user can
+    record it (this catalog is user-global, not part of the repo's `.llm-wiki/`).
+  **Never** write a password, token, key or presigned/SAS URL into either. Flag any secret hard-coded
+  in a connection string so the user can move it to an env var.
 - **Persistence is a separate axis** — document models + migrations only if an ORM is present
   (SQLAlchemy, Django, Prisma, Drizzle…). Many analytics/automation repos have no database; don't
   invent a migration recipe for them. In a T-SQL repo the database *is* the code: document schemas
@@ -98,6 +110,11 @@ doesn't exist yet, create it.
   naming, idempotency idioms, `ERRCODE`s, grants/RLS. R: style, `pkg::fn` vs `library()`, paths
   (`here::here()`), seeds. Slurm: script header order, default resources, log naming, modules.
 - **glossary.md** — domain terms and key entities.
+- **data-sources.md** — **only if** the repo connects to something external (see Data sources
+  above). Copy the plugin's `templates/wiki/data-sources.md` shape: the sources table (name, engine,
+  used-by code paths, direction, objects, whether it's in the user-global catalog), how data flows,
+  and the gotchas. No connection details, no secrets. If the repo connects to nothing, don't create
+  it — and drop its row from the copied `README.md` Layout table.
 - **recipes.md** — step-by-step playbooks for this repo's common tasks, with the **real commands**;
   include only the tasks that fit the archetype (e.g. "run the pipeline / add a data source" for ETL,
   "add an endpoint / add a migration" only for web + ORM, "preview the deploy / add a proc / rename

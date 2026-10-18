@@ -39,31 +39,45 @@ formatting, comments, or trivial one-liners.)
 Update the wiki in the same session:
 
 1. **Fix the affected pages.** Update `index.md` rows, the relevant `modules/<name>.md`, and
-   `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md` if the change touched them.
+   `architecture.md`/`conventions.md`/`glossary.md`/`recipes.md`/`data-sources.md` if the change
+   touched them.
 2. **Add a module page** for any significant new subsystem, from `modules/_TEMPLATE.md`.
 3. **Repair cross-references** you invalidated (moved/renamed/deleted files).
 4. **Append a `log.md` entry** using the parseable prefix:
    `## [YYYY-MM-DD] update | <short summary>`.
 
-## Data sources (cross-project catalog)
+## Data sources (two tiers)
 
 Named data sources recur across repos — a SQL Server like `SRVDATSCIENCE02`, an ODBC DSN like
-`ORABIPROD`, a Postgres service. Record each **once** in a user-global catalog so any session
-recognizes it and reuses the right connection form.
+`ORABIPROD`, a Postgres service, a warehouse account, an `s3://` bucket, a `\\server\share`. They get
+recorded in **two** places, answering two different questions, joined on the source **Name**:
 
-- **Catalog location:** `~/.claude/llm-wiki/data-sources.md` (Windows:
-  `%USERPROFILE%\.claude\llm-wiki\data-sources.md`). It lives in your home, **not** in the repo, and is
-  shared across all repos. Create it on first need.
-- **Consult it** when you start work that touches data access, and whenever you write connection code.
+- **User-global catalog** — `~/.claude/llm-wiki/data-sources.md` (Windows:
+  `%USERPROFILE%\.claude\llm-wiki\data-sources.md`): *how to connect* — engine, connect-via,
+  driver/DSN, auth model, credential env-var **names**, and the repos that use it. Lives in your home,
+  **not** in the repo, shared across all repos. Create it on first need.
+- **Repo page** — `.llm-wiki/data-sources.md`: *what this repo does with it* — which code paths touch
+  each source, direction, the objects/prefixes/topics actually used, repo-specific gotchas. Committed
+  wiki canon; optional (a repo that connects to nothing has no such page). Create it from
+  `templates/wiki/data-sources.md` when the repo gains its first external source, and add the
+  `index.md` Map row.
+
+A fact true in every repo that uses the source belongs in the catalog; a fact true only here belongs
+on the page. Don't duplicate across the two.
+
+- **Consult both** when you start work that touches data access, and whenever you write connection code.
 - **Recognize:** when you see a connection in code (`pyodbc.connect`, SQLAlchemy `create_engine`,
-  `DBI::dbConnect`, `saspy.SASsession`, a `Server=`/`DSN=` string, `pg_service`, `sascfg_personal.py`),
-  match the host/DSN/cfgname to a catalog entry and reuse its driver and auth model — this spans
-  **SQL Server, Oracle, PostgreSQL and SAS**. **Remember:** if it's not in the catalog, add it (upsert
-  by name — never duplicate an existing source).
+  `DBI::dbConnect`, `saspy.SASsession`, `boto3.client("s3")`, `snowflake.connector`, `duckdb.connect`,
+  `KafkaConsumer`, a `Server=`/`DSN=`/`s3://` string or a UNC path, `pg_service`,
+  `sascfg_personal.py`), match it to a catalog entry and reuse that driver and auth model.
+  **Remember:** if it's not there, add it (upsert by name — never duplicate an existing source).
 - **Never store secrets.** Record engine / host / DSN / driver / auth *method* and the **names** of the
-  env vars or secret-store entries that hold credentials — never a password or token. If you find a
-  credential inlined in code, record the source without it and flag the leak.
-- Detection patterns, the table format, auth-model inference, and the GitHub Copilot mirror are in
+  env vars or secret-store entries that hold credentials — never a password, token or presigned URL. If
+  you find a credential inlined in code, record the source without it and flag the leak.
+- The dedicated **`data-sources` skill** carries this protocol in full and fires in any repo, with or
+  without a wiki. Detection signatures and the threshold for what counts as a key source are in
+  [references/data-source-detection.md](references/data-source-detection.md); the table format,
+  auth-model inference and the GitHub Copilot mirror are in
   [references/data-sources.md](references/data-sources.md).
 
 ## Principles
@@ -80,6 +94,11 @@ recognizes it and reuses the right connection form.
 
 - Page formats (frontmatter, cross-links, the index table shape): see
   [references/page-formats.md](references/page-formats.md).
+- **An old wiki can be retrofitted.** You read `index.md` first anyway, so its `wiki_contract:` key is
+  free to check. If it is missing, or below `CURRENT_CONTRACT` in
+  [references/wiki-contract.md](references/wiki-contract.md), the wiki predates part of the current
+  layout — mention `/llm-wiki:upgrade` **once** in the session and carry on with the task. Don't
+  backfill it yourself mid-task, and don't raise it again.
 - **The Markdown is the canon — don't read or maintain the HTML view as an agent.** `/llm-wiki:view`
   can generate a human-only review dashboard at `.llm-wiki/view/index.html` (derived from these pages,
   gitignored by default). It is for people to skim; never read it to orient (it just costs tokens for
@@ -87,9 +106,12 @@ recognizes it and reuses the right connection form.
   [references/view-layer.md](references/view-layer.md).
 - Why and how the wiki saves tokens, plus page-size budgets: see
   [references/token-efficiency.md](references/token-efficiency.md).
-- The cross-project **data-source catalog** — recognizing/remembering named connections, the table
+- **Data sources** — the two tiers (cross-project catalog + the optional repo page), the table
   format, auth-model inference, the never-store-secrets rule, and the Copilot mirror: see
-  [references/data-sources.md](references/data-sources.md).
+  [references/data-sources.md](references/data-sources.md). The threshold for "key data source" and
+  the detection signatures per engine class (relational, warehouses, object stores and shares,
+  embedded, queues/streams, APIs/SFTP, SAS): see
+  [references/data-source-detection.md](references/data-source-detection.md).
 - Detecting the stack and writing stack-correct recipes/pages: see
   [references/stacks.md](references/stacks.md). It covers Python & Node package managers and tooling,
   the **T-SQL** toolchains (SDK-style/classic `.sqlproj` + sqlpackage, sqlcmd script repos, SSIS +
@@ -120,5 +142,6 @@ recognizes it and reuses the right connection form.
 
 If the plugin is installed, these commands drive the wiki explicitly:
 `/llm-wiki:init` (bootstrap), `/llm-wiki:update` (refresh after changes), `/llm-wiki:lint`
-(health-check), `/llm-wiki:view` (build the human-only HTML review dashboard from the canon). You can
+(health-check), `/llm-wiki:upgrade` (retrofit an older wiki to the current structural contract),
+`/llm-wiki:view` (build the human-only HTML review dashboard from the canon). You can
 also do any of this by hand following the guidance above.

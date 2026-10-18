@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Single-plugin marketplace hosting the llm-wiki plugin.",
-    "version": "0.2.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "llm-wiki",
       "source": "./",
-      "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) for AI coding agents — Python, Node.js, T-SQL, PostgreSQL and R repos, plus Slurm/HPC jobs."
+      "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) for AI coding agents — Python, Node.js, T-SQL, PostgreSQL and R repos, plus Slurm/HPC jobs — and recognizes and documents the data sources each repo connects to."
     }
   ]
 }

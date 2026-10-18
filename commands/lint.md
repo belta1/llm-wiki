@@ -43,14 +43,37 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init`.
    `CREATE OR REPLACE FUNCTION`), or whose parameters/result columns/error numbers/`ERRCODE`s
    changed.
 8. **Structure** — pages missing frontmatter or exceeding the size budgets in
-   `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/page-formats.md`.
-9. **Data-source catalog** (the user-global `~/.claude/llm-wiki/data-sources.md`, if present):
-   - **Secret leak** — any password/token/key *value* in the catalog, or a credential inlined in a
-     connection string in the repo's code or recipes (e.g. `PWD=…`, `Password=…` with a literal). Flag
-     it; the value must move to an env var / secret store and the catalog hold only the env-var name.
-   - **Catalog drift** — a named data source the repo's code connects to that is **missing** from the
-     catalog, or a catalog entry whose driver / auth model / connect form no longer matches the code.
-   See `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`.
+   `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/page-formats.md`. `wiki_contract:` is a
+   legitimate key **on `index.md` only** — don't flag it as unexpected there, and never copy it onto
+   another page. `log.md` and `README.md` carry no frontmatter by design; don't flag or add it.
+9. **Data sources** — both tiers: the user-global catalog `~/.claude/llm-wiki/data-sources.md` (if
+   present) and the repo page `.llm-wiki/data-sources.md` (if present).
+   - **9a Secret leak** — any password/token/key *value* in either tier, or a credential inlined in a
+     connection string in the repo's code or recipes (e.g. `PWD=…`, `Password=…` with a literal). Also
+     flag presigned / SAS URLs (`?sig=…`, `X-Amz-Signature=…`) — the URL *is* the credential — API
+     keys, and any service-account JSON key committed in-repo. The value must move to an env var /
+     secret store, leaving only the env-var name behind.
+   - **9b Global catalog drift** — a named data source the repo's code connects to that is **missing**
+     from the catalog, or a catalog entry whose driver / auth model / connect form no longer matches
+     the code.
+   - **9c Repo page drift** — a `Used by (code)` path or module link on `data-sources.md` that no
+     longer exists; a connection in the code with no row on the page; a row whose source the repo no
+     longer touches; a `Data sources used` table on a module page that contradicts the page.
+   - **9d Two-tier consistency** — a page row marked `Catalog: yes` with no matching catalog row
+     (upsert it); a page row carrying driver / DSN / auth / credential-name detail that belongs in the
+     catalog (a tier violation — move it); a catalog entry whose `Used by:` omits this repo.
+   - **9e Page presence** — the repo's code connects to external sources but there is no
+     `data-sources.md` (suggest creating it from the template, plus the `index.md` row); or
+     `data-sources.md` still holds only the template's placeholder rows (suggest deleting it along
+     with its `index.md` links and the `README.md` Layout row).
+   See `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md` (tiers, formats, security)
+   and `.../data-source-detection.md` (the threshold — don't report telemetry hosts, package
+   registries, `localhost` or repo-relative fixtures as missing sources).
+10. **Contract drift** — `index.md`'s `wiki_contract:` is **below** `CURRENT_CONTRACT` in
+   `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/wiki-contract.md`, or **absent** (a wiki that
+   predates the stamp). The wiki is missing structure the current templates define — pages, `index.md`
+   hooks, the pointer blocks' view line, the `.gitignore` entry. Report the level it's at and the fix:
+   run `/llm-wiki:upgrade`. Don't enumerate the individual gaps here — that command diagnoses them.
 
 ## Output
 
@@ -62,7 +85,8 @@ suggestion. Also suggest new pages/recipes worth adding and gaps worth investiga
 - **Safe fixes** (apply when in "fix" mode): repair/remove broken links, correct index paths, add
   missing `status`/`updated` frontmatter, mark clearly-stale pages `status: stale`.
 - **Judgement fixes** (propose, don't auto-apply): rewriting stale content, creating new module
-  pages, resolving contradictions, adding/correcting data-source catalog entries — these need the code
-  read carefully; do them like `/llm-wiki:update`. **Never** auto-remove a flagged secret from source
+  pages, resolving contradictions, adding/correcting data-source entries at either tier — these need the code
+  read carefully; do them like `/llm-wiki:update`. **Contract drift (check 10) is never fixed here** —
+  report it and let `/llm-wiki:upgrade` do it, so the backfill logic lives in one place. **Never** auto-remove a flagged secret from source
   code; report it and let the human move it to a secret store.
 - Append a `log.md` entry: `## [<today>] lint | <summary of findings and fixes applied>`.

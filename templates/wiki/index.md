@@ -2,6 +2,7 @@
 updated: YYYY-MM-DD
 covers: [overview, navigation]
 status: draft
+wiki_contract: 2
 ---
 
 # Index — <REPO NAME>
@@ -49,6 +50,7 @@ shared queue / shared files/DB / the stored-procedure or SQL-function contract /
 | _Auth_ | `src/auth/` | _Login, sessions, tokens_ | [auth](modules/auth.md) |
 | _API_ | `src/api/` `src/routes/` | _HTTP endpoints_ | [api](modules/api.md) |
 | _Data_ | `src/db/` `db/migrations/` | _Models, persistence_ | [data](modules/data.md) |
+| _Data sources_ | `src/etl/extract.py` `src/ingest/` | _external DBs / shares / buckets / APIs this repo reads or writes_ | [data-sources](data-sources.md) |
 | _..._ | _..._ | _..._ | _..._ |
 
 _Every "key files" cell holds real paths so an agent can open them directly._
@@ -58,11 +60,16 @@ _Every "key files" cell holds real paths so an agent can open them directly._
 - **Fix a bug in _<area>_** → [_<module>_](modules/_<module>_.md), `<key file>`
 - **Add a _<feature type>_** → [recipes](recipes.md#_<recipe>_), [_<module>_](modules/_<module>_.md)
 - **Change the data model** → [recipes](recipes.md#_<recipe>_), `<migrations dir>`
+- **Read / write an external source** → [data-sources](data-sources.md), `<ingest file>` _(delete if the repo connects to nothing)_
 - **Run / debug locally** → [recipes](recipes.md#run-locally)
 
 ## Also see
 
 - [architecture](architecture.md) — how the pieces fit together
+<!-- Keep only if the repo connects to external data; delete this block otherwise (and the
+     Data sources Map row above, and the data-sources.md row in README.md's Layout table).
+- [data-sources](data-sources.md) — the external data this repo reads and writes
+-->
 - [conventions](conventions.md) — how to write code that matches this repo
 - [glossary](glossary.md) — domain terms
 - [log](log.md) — recent wiki changes

@@ -58,6 +58,9 @@ uv add --dev <pkg>      # dev (e.g. pytest plugins)
 1. Add a reader in `src/sales_insights/ingest.py` (one function per source; set dtypes explicitly).
 2. Have `pipeline.py` call it and pass the frame into `transform`.
 3. Add a small fixture under `tests/fixtures/` and a test.
+4. If it's an **external** source (a share, server, bucket or API), add a row to
+   [data-sources](data-sources.md) with the real code path, direction and objects used — and record
+   *how to connect* in the user-global catalog, not here. Credential env-var **names** only.
 
 ## Add a transform
 

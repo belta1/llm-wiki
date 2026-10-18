@@ -85,25 +85,43 @@ closest worked example for page shape and brevity:
      `stacks.md` Step 3) — decides which module pages and archetype-specific recipes to write. Detect
      **persistence** separately.
    - **Hybrid / monorepo** (see step 3b).
-   - **Data sources** — scan connection code for named data sources (pyodbc / SQLAlchemy
-     `create_engine` / `DBI::dbConnect` / `saspy.SASsession`, `Server=`/`Data Source=`/`DSN=` strings,
-     `pg_service.conf`, `tnsnames.ora`, `sascfg_personal.py` + `*.sas` `libname`/`signon`,
-     `.env.example`) — map **SQL Server, Oracle, PostgreSQL and SAS** especially, each by its own
-     driver/connection shape. For each, **upsert** an entry (match by host/DSN name, don't
-     duplicate) into the user-global catalog `~/.claude/llm-wiki/data-sources.md` — engine, connect-via,
-     driver/DSN, auth model, and credential env-var **names** only. **Never record a secret**; flag any
-     credential inlined in code. Follow
-     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md`. (This catalog is cross-project —
-     it is not part of the repo's `.llm-wiki/`.)
+   - **Data sources** — scan connection code for named external sources across every class:
+     **relational** (pyodbc / SQLAlchemy `create_engine` / `DBI::dbConnect` / `psycopg` / `oracledb`),
+     **warehouses** (`snowflake.connector`, `pandas_gbq`/bigquery, `databricks.sql`,
+     `redshift_connector`, dbt `profiles.yml`), **object stores & network shares**
+     (`boto3.client("s3")`, `s3://`, `adlfs`/`abfss://`, `gcsfs`/`gs://`, `pd.read_parquet`/
+     `read_excel` over a UNC or mounted path, SharePoint/Graph), **local/embedded**
+     (`duckdb.connect`, `sqlite3.connect`), **caches/queues/streams** (`redis.Redis`,
+     `pymongo.MongoClient`, `KafkaConsumer`, `pika`, SQS), **APIs & transfer** (`paramiko`/`pysftp`/
+     `ftplib`, `httpx.Client(base_url=)`), and **SAS** (`saspy.SASsession`, `sascfg_personal.py`,
+     `*.sas` `libname`/`signon`) — plus `Server=`/`Data Source=`/`DSN=` strings and config/env files
+     (`pg_service.conf`, `odbc.ini`, `tnsnames.ora`, `appsettings*.json`, `.env.example`). Detect each
+     by its own driver/connection shape, not by file extension.
+     **Apply the threshold first** — external & named, durable & likely shared, load-bearing — so
+     telemetry hosts, package registries, `localhost`, temp files and repo-relative fixtures never
+     become entries; and keep **one entry per source**, never per table/file/topic. Then record in
+     **two tiers**:
+     - **User-global catalog** `~/.claude/llm-wiki/data-sources.md` — **upsert** by host/DSN/account
+       name (don't duplicate): engine, connect-via, driver/DSN, auth model, credential env-var
+       **names** only, and append this repo to the source's `Used by:` line. Cross-project — **not**
+       part of the repo's `.llm-wiki/`. Skip this tier for repo-local-only stores.
+     - **Repo page** `.llm-wiki/data-sources.md` — created in step 3 if you found anything.
+     **Never record a secret** (a presigned/SAS URL is itself a secret); flag any credential inlined
+     in code. Follow `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-source-detection.md`
+     (threshold + signatures) and `.../data-sources.md` (formats, tiers, auth inference, security).
    - Top-level structure, entry points, routing, data layer, tests location; existing conventions by
      sampling a few representative files. Keep it efficient — sample, don't read everything.
 
 3. **Create `.llm-wiki/`** by copying `${CLAUDE_PLUGIN_ROOT}/templates/wiki/` and filling each page:
-   - `README.md` — leave as-is (explains the dir to humans).
+   - `README.md` — copy as-is (it explains the dir to humans), with one exception: if you do **not**
+     create `data-sources.md` below, delete its row from the Layout table.
    - `index.md` — the map table (area → key file paths → purpose → module link) and the
      "Where to start by task" router. This is the most important page; make paths real. Fill the
      **Stack** block with the package manager and the real run/build/test/lint/typecheck commands
-     from step 2.
+     from step 2. Keep the template's `wiki_contract:` frontmatter key at the value it ships with —
+     it records the structural contract this wiki satisfies, so `/llm-wiki:upgrade` knows a fresh
+     wiki is already current. See
+     `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/wiki-contract.md`.
    - `architecture.md` — system shape, main components, data/control flow, boundaries.
    - `conventions.md` — package manager, formatter/linter/type-check config locations, naming,
      patterns to reuse, testing approach, error handling, import boundaries, do/don't.
@@ -121,11 +139,21 @@ closest worked example for page shape and brevity:
      analysis), submit / test small / check `sacct` / rerun failed array tasks / run one task locally
      (Slurm). Only include recipes whose tooling actually exists — never an `ALTER TABLE` recipe for
      a state-based `.sqlproj`, never a Slurm recipe that computes on the login node.
+   - `data-sources.md` — **only if step 2 found at least one external data source** passing the
+     threshold. Fill the table with real names, the real code paths that touch each source, the
+     direction, and the objects/prefixes/topics actually used; add the repo-specific gotchas. Keep
+     *connection* detail (driver, DSN, auth, credential names) out of it — that is the user-global
+     catalog's job; mark each row `Catalog: yes` or `no (repo-local)`. Then rewrite the `index.md`
+     **Data sources** Map row with real paths and uncomment the `data-sources` line in "Also see".
+     **If you found no external sources:** do not create the page, drop the Map row, leave the
+     "Also see" block commented, and delete the `data-sources.md` row from `README.md`'s Layout
+     table. Never put a secret on this page.
    - `modules/<name>.md` — one page per natural unit for the archetype (router/app, pipeline stage,
      DAG/flow, job/automation, worker, serverless function, ML concern, CLI group, DB schema/subject
      area, warehouse layer, SSIS package group, R package area / Shiny module / report group, Slurm
      job group), from `modules/_TEMPLATE.md` (fill its optional **Database objects** table for
-     DB-shaped modules and its **Jobs** table for Slurm job groups).
+     DB-shaped modules, its **Jobs** table for Slurm job groups, and its **Data sources used** table
+     for any module that reads or writes external data).
    - `log.md` — seed with the first entry (see step 5).
 
 3b. **Hybrid (polyglot) and monorepo repos.** If Step 1 found **more than one language** (e.g.
@@ -158,8 +186,10 @@ closest worked example for page shape and brevity:
 
 5. **Append the first `log.md` entry**: `## [<today>] init | <one-line summary of what was created>`.
 
-6. **Report** to the user: the pages created, the modules covered, any **data sources** added to or
-   matched in the cross-project catalog, and anything you were unsure about or deliberately left thin,
+6. **Report** to the user: the pages created, the modules covered, **data sources** at both tiers
+   (added to or matched in the cross-project catalog, and listed on `data-sources.md` — say if you
+   created that page or deliberately did not), any credential you found inlined in code, and
+   anything you were unsure about or deliberately left thin,
    so they can direct follow-ups. Mention that `/llm-wiki:view` can build a human-only HTML review
    dashboard (`.llm-wiki/view/index.html`) from these pages — offer to run it, but don't generate it
    unprompted.

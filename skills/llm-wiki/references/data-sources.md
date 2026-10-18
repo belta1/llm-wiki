@@ -7,8 +7,10 @@ each named source **once** so any session can recognize it in code and reuse the
 form — without ever storing a secret.
 
 This is a **cross-project** store: it lives in the user's home, outside any repo, and is **not**
-committed. It is maintained by the `llm-wiki` skill and the `/llm-wiki:init` / `update` / `lint`
-commands.
+committed. It is maintained by the `data-sources` and `llm-wiki` skills and the `/llm-wiki:init` /
+`update` / `lint` commands. Its repo-scoped counterpart — which code in *one* repo touches which
+source — is the optional wiki page `.llm-wiki/data-sources.md`; see
+[Two tiers](#two-tiers-this-catalog-vs-the-repos-wiki-page) below.
 
 ## Location
 
@@ -72,40 +74,53 @@ Columns:
   that supply user/password. **Never a value.**
 - **Notes** — anything short and useful ("trusted preferred", "read replica", port, etc.).
 
+### How each column reads per source class
+
+The columns were designed around relational engines but generalize — reinterpret them, don't change
+them (the Copilot mirror template and both installer scripts depend on this shape):
+
+| Column | RDBMS | Warehouse | Object store / share | Queue / stream | API / SFTP | Embedded file |
+|---|---|---|---|---|---|---|
+| Name | host or DSN | account + warehouse | bucket or UNC root | cluster / broker host | service name | path / logical store |
+| Engine | SQL Server, Oracle, … | Snowflake, BigQuery, … | S3, Azure Blob, GCS, SMB share, SharePoint | Kafka, Redis, RabbitMQ, SQS, MongoDB | REST, GraphQL, SOAP, SFTP, FTP | SQLite, DuckDB, Parquet dataset |
+| Connect via | pyodbc, SQLAlchemy | snowflake-connector, `bigrquery` | boto3, s3fs, adlfs, `pd.read_parquet` | kafka-python, redis-py | httpx, requests, paramiko | `duckdb.connect` |
+| Driver / DSN | ODBC driver name | account URL / `http_path` / project id | region + container/prefix | bootstrap servers + security protocol | base URL + API version | file path or glob |
+| Auth | trusted, user+password, Azure AD | key-pair, SSO, OAuth, service account | IAM role, SAS token, ADC, share ACL | SASL mechanism, mTLS, none | API key, OAuth2, SSH key | filesystem ACL |
+| Credentials | env-var names | env names, config-file key, SA key **path** | `AWS_PROFILE`, `AZURE_*` names | `KAFKA_*` names | `*_API_KEY` name, key path | n/a |
+| Notes | read replica, port | warehouse size, billing | layout `dt=…`, retention | topics, partitions | rate limit, pagination | refresh cadence |
+
+## Two tiers: this catalog vs. the repo's wiki page
+
+There are two places a data source gets recorded, answering two different questions and joined on
+the **Name** column (matched case-insensitively — the same key the upsert rule below uses).
+
+| | **This catalog** `~/.claude/llm-wiki/data-sources.md` | **Repo page** `.llm-wiki/data-sources.md` |
+|---|---|---|
+| Question | *How do I connect to `SRVPLATDAT`?* | *What does **this** repo do with it?* |
+| Scope | user-global, **never** committed | one repo, **committed** wiki canon |
+| Owns | engine, connect-via, driver/DSN, auth model, credential **names**, connect snippets, the `Used by:` repo list | which code paths touch it, read/write direction, the tables/prefixes/topics actually used, repo gotchas, local/dev substitutes |
+| Must not hold | repo-specific usage or code paths | driver strings, DSN detail, auth mechanism, credential names |
+
+**Non-duplication rule:** a fact true in every repo that uses the source belongs here; a fact true
+only in one repo belongs on that repo's page.
+
+A source that exists only inside one repo or its dev environment (a DuckDB build artifact, a
+`docker-compose` dev Postgres, committed fixtures) gets a repo-page row marked
+`Catalog: no (repo-local)` and **no** row here. The repo page's reverse index is this catalog's
+per-source **`Used by:`** line.
+
+The repo page is committed, so where internal hostnames can't be published it may use a role name
+(`<prod-sales-db>`) while the real host stays here — the role name then becomes the join key.
+
 ## Detecting a data source in code (recognize)
 
-During `init`/`update`, and whenever you touch connection code, look for these and match (or add) a
-catalog entry. The **Name** is the server host or DSN you extract. The common engines to map are
-**SQL Server**, **Oracle**, **PostgreSQL**, and **SAS** (plus MySQL and others) — detect each by its
-own driver/connection shape, not just by a `.sql`/`.py` extension.
+Detection signatures for every engine class — relational, warehouses and lakehouse, object stores
+and network shares, local/embedded files, caches/queues/streams, APIs and SFTP, SAS sessions, plus
+connection-string tokens and config/env signals — and the **threshold** that decides whether a
+connection deserves a record at all, live in
+[data-source-detection.md](data-source-detection.md). Read it before scanning a repo.
 
-- **Python**
-  - `pyodbc.connect("…")` / `pyodbc.connect(dsn=…)`
-  - `sqlalchemy.create_engine("mssql+pyodbc://…")`, `"oracle+oracledb://…"` / `"oracle+cx_oracle://…"`,
-    `"postgresql+psycopg://…"` / `"postgresql+psycopg2://…"`, `"mysql+pymysql://…"`
-  - `oracledb.connect(...)` / `cx_Oracle.connect(...)`, `pymssql.connect(...)`,
-    `psycopg2.connect(...)` / `psycopg.connect(...)`
-  - **SAS** — `saspy.SASsession(cfgname="…")`: the cfgname points at an entry in `sascfg_personal.py`
-    (IOM / STDIO / SSH). The data source is the SAS server behind that cfgname; credentials come from
-    an `authinfo` file key or env, never inline. Record the cfgname as the **Name** and the libraries
-    the repo relies on.
-- **R** — `DBI::dbConnect(odbc::odbc(), dsn=…, Driver=…, Server=…, Trusted_Connection=…)`,
-  `RODBC::odbcConnect("<DSN>")`, `DBI::dbConnect(RPostgres::Postgres(), …)`,
-  `DBI::dbConnect(ROracle::Oracle(), …)`.
-- **Connection-string tokens** (any language / config file):
-  - host: `Server=` / `Data Source=` / `Address=` / `HOST=`
-  - DSN: `DSN=<name>`
-  - driver: `Driver={…}`
-  - **trusted**: `Trusted_Connection=yes` / `Integrated Security=SSPI|true` / `Authentication=ActiveDirectory*` / no `UID`
-  - **user+password**: `UID=` / `User Id=` + `PWD=` / `Password=`
-- **Config / env** — `pg_service.conf` + `PG*` vars, `.dsn` / `odbc.ini` / `tnsnames.ora` (Oracle),
-  `.env.example`, `appsettings*.json` connection strings, Django `DATABASES`.
-- **SAS config / programs** — `sascfg_personal.py` / `sascfg.py` (saspy configs: `iomhost`, `iomport`,
-  `authkey`, SSH/STDIO blocks), `~/.authinfo` / `_authinfo` keys, and `*.sas` programs with `libname`,
-  `proc sql … connect to`, or `signon` (SAS/CONNECT). The source is the SAS server behind the
-  cfgname / libname.
-
-### Auth-model inference
+## Auth-model inference
 
 - `Trusted_Connection=yes`, `Integrated Security`, or no `UID`/`User Id` ⇒ **Trusted (Windows)** —
   Credentials = `n/a`.
@@ -114,8 +129,13 @@ own driver/connection shape, not just by a `.sql`/`.py` extension.
 - `Authentication=ActiveDirectory*` / token-based ⇒ **Azure AD** — note the method, no secret.
 - **SAS:** an `authkey` ⇒ credentials live in an **authinfo** file entry — record the key name, never
   the value. `omruser`/`omrpw` or env-sourced creds ⇒ **User + password** — record the env-var names.
+- **Cloud / object stores:** an IAM role, instance profile, `AWS_PROFILE`, managed identity or
+  Application Default Credentials ⇒ record the *mechanism* and the profile/role **name**. A SAS
+  token or presigned URL ⇒ **the URL is itself a secret** (see Security below).
+- **Warehouses:** key-pair, SSO/external browser, OAuth client-credentials, or a service-account JSON
+  key ⇒ record the method, and reference a key file **by path only**.
 
-### Upsert rules (match, don't duplicate)
+## Upsert rules (match, don't duplicate)
 
 - Match an existing entry by **Name** (case-insensitive host/DSN). If found, update only fields that
   changed and append the current repo to **Used by**; do **not** add a second row.
@@ -127,7 +147,16 @@ own driver/connection shape, not just by a `.sql`/`.py` extension.
 ## Security — never store secrets
 
 Record the connection *shape* and the *names* of credential sources. **Never** write a password,
-token, key, or any secret value into the catalog (or into a recipe, or a Copilot instruction file).
+token, key, or any secret value into the catalog (or into a recipe, a repo wiki page, or a Copilot
+instruction file).
+
+Two cases that are easy to get wrong:
+
+- A **SAS token or presigned URL** (`https://acct.blob.core.windows.net/…?sv=…&sig=…`,
+  `s3://…?X-Amz-Signature=…`) *embeds* the credential. The URL is a secret — record the env-var name
+  that supplies it, never the URL itself.
+- A **service-account JSON key** (GCP, or a Snowflake private key) is referenced **by path or
+  env-var name only**; never paste its contents or its key material.
 
 If you find a **literal credential inlined in code** (e.g. `PWD=hunter2` in a connection string):
 
@@ -148,6 +177,8 @@ See `templates/copilot-instructions/data-sources.instructions.md` and `scripts/i
 
 ## See also
 
+- [data-source-detection.md](data-source-detection.md) — the threshold for "key data source" and the
+  detection signatures for every engine class.
 - [stacks.md](stacks.md) — connection detection in context of each stack's toolchain and the
   persistence axis.
 - [page-formats.md](page-formats.md) — frontmatter and size conventions this file follows.

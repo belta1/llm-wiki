@@ -2,6 +2,7 @@
 updated: 2026-09-23
 covers: [overview, navigation]
 status: current
+wiki_contract: 2
 ---
 
 # Index — sales-insights
@@ -27,11 +28,12 @@ No web server, no database — files in, files out. Python + pandas/polars.
 | Pipeline | `src/sales_insights/pipeline.py` `ingest.py` `transform.py` `load.py` | ingest → transform → write processed data | [pipeline](modules/pipeline.md) |
 | Analysis | `src/sales_insights/analysis/` `notebooks/` | reusable metrics + exploratory notebooks | [analysis](modules/analysis.md) |
 | Data | `data/raw/` `data/processed/` | inputs & outputs (git-ignored) | — |
+| Data sources | `src/sales_insights/ingest.py` `load.py` | sales share + SQL Server in, parquet/S3 out | [data-sources](data-sources.md) |
 | Config | `src/sales_insights/config.py` | paths, params via pydantic-settings | — |
 
 ## Where to start by task
 
-- **Add a data source** → [recipes](recipes.md#add-a-data-source), `src/sales_insights/ingest.py`
+- **Add a data source** → [recipes](recipes.md#add-a-data-source), [data-sources](data-sources.md), `src/sales_insights/ingest.py`
 - **Add / change a transform** → [recipes](recipes.md#add-a-transform), [pipeline](modules/pipeline.md)
 - **Add a metric or report** → [analysis](modules/analysis.md), `src/sales_insights/analysis/`
 - **Explore interactively** → [recipes](recipes.md#work-in-a-notebook), `notebooks/`
@@ -39,4 +41,4 @@ No web server, no database — files in, files out. Python + pandas/polars.
 
 ## Also see
 
-- [architecture](architecture.md) · [conventions](conventions.md) · [glossary](glossary.md) · [log](log.md)
+- [architecture](architecture.md) · [conventions](conventions.md) · [data-sources](data-sources.md) · [glossary](glossary.md) · [log](log.md)

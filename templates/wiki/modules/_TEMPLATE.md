@@ -32,6 +32,18 @@ _One-sentence purpose: what this subsystem is responsible for._
 | `slurm/<job>.sbatch` | _partition, time, mem, cpus/gpus_ | _`0-99%20` → row of params.csv_ | _`afterok:<job>`_ | _`$SCRATCH/in/` → `results/<job>/`_ |
 -->
 
+<!-- Optional, for modules that read or write external data. Delete if not applicable.
+## Data sources used
+
+| Source | Direction | Objects / datasets | Via |
+|--------|-----------|--------------------|-----|
+| `SRVPLATDAT` | read | `dbo.Sales` | `src/etl/extract.py` (pyodbc) |
+| `s3://corp-lake-raw` | write | `raw/sales/dt=<date>/` | `src/etl/land.py` (boto3) |
+
+Full list: [data-sources](../data-sources.md). Connection details live in the user-global catalog,
+never in the repo — and never a secret.
+-->
+
 ## How it works
 
 _Short description of the flow within this module and how it connects to the rest of the system.

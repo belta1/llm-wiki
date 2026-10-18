@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki",
-  "version": "0.3.0",
-  "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) so AI coding agents orient fast and use fewer tokens. Tuned for Python, Node.js, T-SQL/SQL Server (sqlproj, SQL scripts, SSIS), PostgreSQL (psql script repos) and R (renv, packages, targets, Quarto, Shiny) repos, plus Slurm/HPC batch jobs. Ships an always-on maintainer skill plus /llm-wiki:init, :update, :lint, and :view commands — the last builds a human-only HTML review dashboard from the Markdown canon. Generates pointer files for Claude, Codex/AGENTS.md, and GitHub Copilot.",
+  "version": "0.4.0",
+  "description": "Installs and maintains a per-repo codebase knowledge base (.llm-wiki/) so AI coding agents orient fast and use fewer tokens. Tuned for Python, Node.js, T-SQL/SQL Server (sqlproj, SQL scripts, SSIS), PostgreSQL (psql script repos) and R (renv, packages, targets, Quarto, Shiny) repos, plus Slurm/HPC batch jobs. Ships an always-on maintainer skill plus /llm-wiki:init, :update, :lint, :upgrade and :view commands — :view builds a human-only HTML review dashboard from the Markdown canon, and :upgrade retrofits a wiki made by an older version to the current structural contract. A second, independently-triggering data-sources skill recognizes key external data sources in any repo — relational and warehouse engines, object stores and network shares, embedded files, caches/queues/streams, and named APIs/SFTP — recording reusable connection shape in a user-global catalog and repo-specific usage in an optional .llm-wiki/data-sources.md page, never a secret. Generates pointer files for Claude, Codex/AGENTS.md, and GitHub Copilot.",
   "author": {
     "name": "Jose"
   },
@@ -28,6 +28,14 @@
     "renv",
     "targets",
     "slurm",
-    "hpc"
+    "hpc",
+    "data-sources",
+    "connections",
+    "odbc",
+    "oracle",
+    "sas",
+    "snowflake",
+    "s3",
+    "parquet"
   ]
 }
