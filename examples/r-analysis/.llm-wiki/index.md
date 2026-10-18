@@ -2,6 +2,7 @@
 updated: 2026-09-25
 covers: [overview, navigation]
 status: current
+wiki_contract: 2
 ---
 
 # Index — survey-analysis

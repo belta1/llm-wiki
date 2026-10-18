@@ -41,6 +41,12 @@ The map replaces the search. The agent reads what it needs and skips the rest.
 - **Current beats complete.** A stale wiki costs tokens *and* misleads. Better to document less and
   keep it accurate. That's why maintenance (update on every substantive change) is part of the
   contract, not an afterthought.
+- **Never spend a model on a mechanical check.** Broken links, missing frontmatter, orphan pages,
+  over-budget pages, a malformed log entry, a leaked credential, a stale contract stamp — all of
+  these are decidable by a script, and `scripts/llm-wiki` (shipped into installed repos as
+  `.llm-wiki/bin/llm-wiki`) decides them for zero tokens. Maintenance is where a wiki would
+  otherwise *consume* the budget it exists to save, so run the script first and reserve reading for
+  the one question it cannot answer: does this page still match the code?
 
 ## What NOT to put in the wiki
 

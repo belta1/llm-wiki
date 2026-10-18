@@ -2,3 +2,5 @@
 *.sh text eol=lf
 # PowerShell scripts CRLF (native line endings for Windows PowerShell).
 *.ps1 text eol=crlf
+# The deterministic CLI is extensionless but is a shell-run script.
+scripts/llm-wiki text eol=lf

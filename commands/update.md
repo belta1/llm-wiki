@@ -63,17 +63,23 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` in
 
 4. **Repair cross-references** invalidated by moves/renames/deletes. Remove or redirect dead links.
 
-5. **Append a `log.md` entry**: `## [<today>] update | <short summary of what changed and pages touched>`.
+5. **Check your own work.** Run
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki" lint .llm-wiki --fail-on warning` (or
+   `.llm-wiki/bin/llm-wiki` in a Copilot-only repo) and fix what it reports. Repairing cross-links by
+   hand in step 4 is exactly where a dead link gets left behind; this confirms you got them all for
+   far less than a re-read.
 
-6. **Refresh pointer blocks if needed.** Only if the wiki's entry points changed; edit inside the
+6. **Append a `log.md` entry**: `## [<today>] update | <short summary of what changed and pages touched>`.
+
+7. **Refresh pointer blocks if needed.** Only if the wiki's entry points changed; edit inside the
    `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block only, never the user's surrounding content.
 
-7. **Refresh the HTML view if present.** If `.llm-wiki/view/index.html` exists (the human-only review
+8. **Refresh the HTML view if present.** If `.llm-wiki/view/index.html` exists (the human-only review
    dashboard), offer to regenerate it with `/llm-wiki:view` so it reflects the updated canon — in diff
    mode it can highlight exactly the pages this update changed. Don't regenerate unprompted if there's
    no view yet.
 
-8. **Report** what you updated, any data-source catalog entries added or changed, whether the view was
+9. **Report** what you updated, any data-source catalog entries added or changed, whether the view was
    refreshed, and anything you chose not to touch.
 
 ## Principles

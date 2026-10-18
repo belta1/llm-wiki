@@ -36,8 +36,20 @@ wiki correctly marked current instead of flagging them all stale.
 
 The levels and the per-level deltas live in
 [`skills/llm-wiki/references/wiki-contract.md`](../skills/llm-wiki/references/wiki-contract.md), which
-is the one file to edit when the layout next changes. `/llm-wiki:upgrade` reads its delta tables rather
-than hard-coding them.
+is the main file to edit when the layout next changes — see its *Bumping the contract* section for the
+full list, including the two copies of the constant that ship into target repos.
+`/llm-wiki:upgrade` reads its delta tables rather than hard-coding them.
+
+To see which level a wiki is at without an agent, ask the deterministic lint:
+
+```bash
+python3 .llm-wiki/bin/llm-wiki lint          # or scripts/llm-wiki from a plugin checkout
+```
+
+It reports `contract-stale` with the level, `contract-missing` for an unstamped wiki, or
+`contract-ahead` when the wiki was built by a newer plugin than the tooling reading it. It also
+reports `contract-misplaced` when the stamp has been copied onto a page other than `index.md`, which
+is always wrong — the key is one per wiki, not one per page.
 
 ## The three states
 

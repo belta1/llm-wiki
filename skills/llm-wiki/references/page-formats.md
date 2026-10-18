@@ -101,3 +101,10 @@ The prefix `## [YYYY-MM-DD] <op> | <summary>` makes the log greppable:
 - Module pages: under ~120 lines each. Split or link out if larger.
 - `data-sources.md`: under ~80 lines. It's a list of sources, not a data dictionary.
 - Prefer more small, focused pages over few large ones — agents read only what they need.
+
+Everything on this page that can be checked without reading the code is checked by
+`scripts/llm-wiki` (`.llm-wiki/bin/llm-wiki` inside an installed repo): the frontmatter keys and
+their allowed values, `wiki_contract` being on `index.md` and nowhere else, the `log.md` prefix, the
+budgets above, and relative links including `#anchor` targets. Run
+`python3 .llm-wiki/bin/llm-wiki lint` instead of verifying these by hand — it is free and exhaustive,
+and it means a drift report only spends model attention on what the code says.

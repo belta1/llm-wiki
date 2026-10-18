@@ -72,6 +72,17 @@ When the wiki layout next changes:
    holds the target shape.
 3. Raise `CURRENT_CONTRACT` above.
 4. Update `wiki_contract:` in `templates/wiki/index.md` so fresh `init`s are born current.
+5. Update `CURRENT_CONTRACT` in `scripts/llm-wiki` — the deterministic lint reports the level, and it
+   carries its own copy of the constant because the script also ships into target repos at
+   `.llm-wiki/bin/llm-wiki`, where this file is not available.
+6. Update **every** place `templates/copilot-prompts/llm-wiki-upgrade.prompt.md` names the level —
+   currently its step 1 ("already current" / "lower than N") and its stamp-and-log step. That prompt
+   runs in a target repo and cannot read this file, so it states the level literally.
+   `grep -n 'contract' templates/copilot-prompts/llm-wiki-upgrade.prompt.md` finds them all.
 
-`/llm-wiki:upgrade` reads this file rather than hard-coding the changes, so those four edits are the
-whole job — the command itself does not change.
+`tests/test-docs-consistency.sh` asserts that 3, 4 and 5 agree, and fails the build if a bump misses
+one.
+
+`/llm-wiki:upgrade` reads this file rather than hard-coding the changes, so on the Claude side those
+edits are the whole job — the command itself does not change. The two target-repo copies (5 and 6)
+are the exceptions, because nothing in an installed repo can see this file.

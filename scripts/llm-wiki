@@ -1,0 +1,754 @@
+#!/usr/bin/env python3
+"""Deterministic local checks for a .llm-wiki/ knowledge base.
+
+This is not a replacement for the agentic /llm-wiki:lint workflow. It does the
+half of that command that needs no model — frontmatter, the contract stamp,
+required pages, broken cross-links, orphans, size budgets, the log format,
+secret values and data-source tier violations — so the agent spends its reading
+budget only on the judgement calls (stale claims, convention drift, missing
+module pages, recipe/DB-object drift).
+
+Runs on Python 3.8+, standard library only. Ships two ways:
+  * in the plugin, at ${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki
+  * copied into a repo by scripts/install-copilot.sh, at .llm-wiki/bin/llm-wiki
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+# Findings quote page text, which is em-dash-heavy. A Windows console defaults
+# to a legacy codepage and would raise or mojibake on it.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):  # Python < 3.7, or a redirected pipe
+        pass
+
+# Keep in step with CURRENT_CONTRACT in
+# skills/llm-wiki/references/wiki-contract.md. tests/test-docs-consistency.sh
+# asserts the two agree; the constant is duplicated here on purpose so a copy
+# of this file inside a target repo still knows the current level.
+CURRENT_CONTRACT = 2
+
+SEVERITIES = ("suggestion", "warning", "critical")
+SEVERITY_RANK = {name: index for index, name in enumerate(SEVERITIES)}
+
+# Pages that carry no frontmatter by design (commands/lint.md check 8).
+NO_FRONTMATTER = {"log.md", "README.md"}
+
+# Contract level 1: the pages every wiki has.
+REQUIRED_PAGES = (
+    "index.md",
+    "architecture.md",
+    "conventions.md",
+    "glossary.md",
+    "recipes.md",
+    "log.md",
+    "README.md",
+)
+
+STATUS_VALUES = {"current", "stale", "draft"}
+LOG_OPS = ("init", "update", "lint", "upgrade")
+
+# Size budgets from references/page-formats.md (lines, not bytes).
+BUDGETS = {"index.md": 150, "data-sources.md": 80, "modules": 120}
+
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Templates ship literal placeholders; they are valid in a template, and a real
+# wiki that still carries one is caught by the agentic lint as a draft page.
+PLACEHOLDER_DATE = "YYYY-MM-DD"
+LOG_ENTRY_RE = re.compile(
+    r"^##\s+\[(?P<date>\d{4}-\d{2}-\d{2}|YYYY-MM-DD)\]\s+"
+    r"(?P<op>[a-z|<>]+)\s+\|\s+(?P<summary>\S.*)$"
+)
+MD_LINK_RE = re.compile(r"\[(?P<text>[^\]]*)\]\((?P<target>[^)\s]+)\)")
+HEADING_RE = re.compile(r"^#{1,6}\s+(?P<text>.+?)\s*#*$")
+
+PLACEHOLDER_CHARS = ("<", ">", "…", "...", "${")
+
+SECRET_PATTERNS = (
+    (
+        "secret-password",
+        re.compile(
+            r"\b(?:PWD|PASSWORD|PASSWD|PASS)\s*=\s*(?P<value>[^\s;,\"'|)\]]{3,})",
+            re.I,
+        ),
+        "a literal password in a connection string",
+    ),
+    (
+        "secret-presigned-url",
+        re.compile(r"[?&](?:sig|Signature|X-Amz-Signature)=(?P<value>[^\s&\"'|)\]]{8,})", re.I),
+        "a presigned / SAS URL — the URL is the credential",
+    ),
+    (
+        "secret-aws-key",
+        re.compile(r"\b(?P<value>AKIA[0-9A-Z]{16})\b"),
+        "an AWS access key id",
+    ),
+    (
+        "secret-private-key",
+        re.compile(r"(?P<value>-----BEGIN [A-Z ]*PRIVATE KEY-----)"),
+        "an inlined private key",
+    ),
+    (
+        "secret-api-key",
+        re.compile(
+            r"\b(?:api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\s*[=:]\s*"
+            r"(?P<value>[A-Za-z0-9_\-]{16,})",
+            re.I,
+        ),
+        "a literal API key or token",
+    ),
+)
+
+# Columns that belong in the user-global catalog, never on the repo page
+# (commands/lint.md check 9d).
+CATALOG_ONLY_COLUMNS = ("driver", "dsn", "auth", "credential", "connect via", "connect-via")
+
+
+class Finding:
+    __slots__ = ("severity", "code", "path", "line", "message", "fix")
+
+    def __init__(self, severity, code, path, message, fix, line=None):
+        self.severity = severity
+        self.code = code
+        self.path = path
+        self.line = line
+        self.message = message
+        self.fix = fix
+
+    def as_dict(self):
+        return {
+            "severity": self.severity,
+            "code": self.code,
+            "path": self.path,
+            "line": self.line,
+            "message": self.message,
+            "fix": self.fix,
+        }
+
+
+class Page:
+    def __init__(self, path: Path, root: Path):
+        self.path = path
+        self.rel = path.relative_to(root).as_posix()
+        self.text = path.read_text(encoding="utf-8", errors="replace")
+        self.lines = self.text.splitlines()
+        self.frontmatter, self.body_start = parse_frontmatter(self.lines)
+
+
+def parse_frontmatter(lines):
+    """Return ({key: raw value}, index of the first body line).
+
+    Deliberately not YAML: every key in references/page-formats.md is a flat
+    scalar or an inline list, and a dependency would break the copied-into-a-
+    repo install.
+    """
+    if not lines or lines[0].strip() != "---":
+        return None, 0
+    data = {}
+    for index in range(1, len(lines)):
+        stripped = lines[index].strip()
+        if stripped == "---":
+            return data, index + 1
+        if not stripped or stripped.startswith("#"):
+            continue
+        if ":" not in stripped:
+            continue
+        key, _, value = stripped.partition(":")
+        data[key.strip()] = value.strip()
+    return None, 0  # opened but never closed
+
+
+def slugify(heading: str) -> str:
+    """GitHub-style anchor slug.
+
+    GitHub drops punctuation and then maps each remaining space to one hyphen,
+    so `## Add a metric / report` becomes `add-a-metric--report` — two hyphens.
+    Collapsing whitespace here would report correct links as broken.
+    """
+    text = heading.strip().lower()
+    text = MD_LINK_RE.sub(lambda m: m.group("text"), text)
+    text = re.sub(r"[`*_~]", "", text)
+    text = re.sub(r"[^\w\s-]", "", text)
+    return re.sub(r"\s", "-", text).strip("-")
+
+
+def is_placeholder(value: str) -> bool:
+    return any(token in value for token in PLACEHOLDER_CHARS)
+
+
+def collect_pages(root: Path):
+    pages = []
+    for path in sorted(root.rglob("*.md")):
+        rel_parts = path.relative_to(root).parts
+        # view/ is a generated artifact; bin/ is this script's own home.
+        if rel_parts[0] in {"view", "bin"}:
+            continue
+        pages.append(Page(path, root))
+    return pages
+
+
+# --------------------------------------------------------------------------
+# checks
+
+
+def check_required_pages(root: Path, findings):
+    for name in REQUIRED_PAGES:
+        if not (root / name).is_file():
+            findings.append(
+                Finding(
+                    "critical",
+                    "missing-page",
+                    name,
+                    "required page is missing",
+                    "create it from ${CLAUDE_PLUGIN_ROOT}/templates/wiki/%s" % name,
+                )
+            )
+    if not (root / "modules").is_dir():
+        findings.append(
+            Finding(
+                "critical",
+                "missing-page",
+                "modules/",
+                "the modules/ directory is missing",
+                "create it and add a page per subsystem from modules/_TEMPLATE.md",
+            )
+        )
+
+
+def check_frontmatter(page: Page, findings):
+    name = Path(page.rel).name
+    if page.rel in NO_FRONTMATTER or name in NO_FRONTMATTER:
+        if page.frontmatter is not None:
+            findings.append(
+                Finding(
+                    "warning",
+                    "unexpected-frontmatter",
+                    page.rel,
+                    "this page carries no frontmatter by design",
+                    "remove the frontmatter block",
+                    line=1,
+                )
+            )
+        return
+
+    if page.frontmatter is None:
+        findings.append(
+            Finding(
+                "critical",
+                "missing-frontmatter",
+                page.rel,
+                "no (or unterminated) YAML frontmatter block",
+                "add updated: / covers: / status: — see references/page-formats.md",
+                line=1,
+            )
+        )
+        return
+
+    fm = page.frontmatter
+    updated = fm.get("updated")
+    if updated is None:
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-key",
+                page.rel,
+                "frontmatter has no `updated:` key",
+                "add `updated: <ISO date>`",
+                line=2,
+            )
+        )
+    elif updated != PLACEHOLDER_DATE and not DATE_RE.match(updated):
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-value",
+                page.rel,
+                "`updated: %s` is not an ISO date" % updated,
+                "use YYYY-MM-DD",
+                line=2,
+            )
+        )
+
+    covers = fm.get("covers")
+    if covers is None:
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-key",
+                page.rel,
+                "frontmatter has no `covers:` key",
+                "add `covers: [area, ...]`",
+                line=3,
+            )
+        )
+    elif not (covers.startswith("[") and covers.endswith("]")):
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-value",
+                page.rel,
+                "`covers:` is not an inline list",
+                "write it as `covers: [auth, sessions]`",
+                line=3,
+            )
+        )
+
+    status = fm.get("status")
+    if status is None:
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-key",
+                page.rel,
+                "frontmatter has no `status:` key",
+                "add `status: current | stale | draft`",
+                line=4,
+            )
+        )
+    elif status not in STATUS_VALUES:
+        findings.append(
+            Finding(
+                "critical",
+                "frontmatter-value",
+                page.rel,
+                "`status: %s` is not one of current / stale / draft" % status,
+                "use one of current, stale, draft",
+                line=4,
+            )
+        )
+
+
+def check_contract(root: Path, pages, findings):
+    for page in pages:
+        if page.frontmatter is None or page.rel == "index.md":
+            continue
+        if "wiki_contract" in page.frontmatter:
+            findings.append(
+                Finding(
+                    "critical",
+                    "contract-misplaced",
+                    page.rel,
+                    "`wiki_contract:` belongs on index.md and nowhere else",
+                    "delete the key from this page",
+                    line=2,
+                )
+            )
+
+    index = next((p for p in pages if p.rel == "index.md"), None)
+    if index is None or index.frontmatter is None:
+        return
+    raw = index.frontmatter.get("wiki_contract")
+    if raw is None:
+        findings.append(
+            Finding(
+                "warning",
+                "contract-missing",
+                "index.md",
+                "no `wiki_contract:` stamp — this wiki predates the stamp and is "
+                "treated as contract 1",
+                "run /llm-wiki:upgrade (Copilot: /llm-wiki-upgrade)",
+                line=2,
+            )
+        )
+        return
+    try:
+        level = int(raw.split("#")[0].strip())
+    except ValueError:
+        findings.append(
+            Finding(
+                "critical",
+                "contract-value",
+                "index.md",
+                "`wiki_contract: %s` is not a number" % raw,
+                "stamp the integer contract level, e.g. `wiki_contract: %d`" % CURRENT_CONTRACT,
+                line=2,
+            )
+        )
+        return
+    if level < CURRENT_CONTRACT:
+        findings.append(
+            Finding(
+                "warning",
+                "contract-stale",
+                "index.md",
+                "wiki is at contract %d, current is %d" % (level, CURRENT_CONTRACT),
+                "run /llm-wiki:upgrade (Copilot: /llm-wiki-upgrade)",
+                line=2,
+            )
+        )
+    elif level > CURRENT_CONTRACT:
+        findings.append(
+            Finding(
+                "warning",
+                "contract-ahead",
+                "index.md",
+                "wiki is at contract %d, this tool knows %d — it was built by a "
+                "newer plugin" % (level, CURRENT_CONTRACT),
+                "upgrade the plugin; do not downgrade the wiki",
+                line=2,
+            )
+        )
+
+
+def check_links(root: Path, pages, findings):
+    headings = {}
+    for page in pages:
+        slugs = set()
+        for line in page.lines:
+            match = HEADING_RE.match(line)
+            if match:
+                slugs.add(slugify(match.group("text")))
+        headings[page.rel] = slugs
+
+    inbound = {page.rel: 0 for page in pages}
+    root_resolved = root.resolve()
+
+    for page in pages:
+        page_dir = page.path.parent
+        for number, line in enumerate(page.lines, start=1):
+            for match in MD_LINK_RE.finditer(line):
+                target = match.group("target").strip()
+                if not target or is_placeholder(target):
+                    continue
+                if re.match(r"^[a-z][a-z0-9+.-]*:", target):  # http:, mailto:, …
+                    continue
+                anchor = ""
+                if "#" in target:
+                    target, _, anchor = target.partition("#")
+                if not target:  # same-page anchor
+                    if anchor and anchor not in headings[page.rel]:
+                        findings.append(
+                            Finding(
+                                "critical",
+                                "broken-anchor",
+                                page.rel,
+                                "link to #%s — no such heading on this page" % anchor,
+                                "fix the anchor or add the heading",
+                                line=number,
+                            )
+                        )
+                    continue
+                # Links to code paths / directories point outside the wiki and
+                # are checked by the agentic lint against the repo, not here.
+                if not target.endswith(".md"):
+                    continue
+                resolved = (page_dir / target).resolve()
+                try:
+                    rel = resolved.relative_to(root_resolved).as_posix()
+                except ValueError:
+                    rel = None
+                if not resolved.is_file():
+                    findings.append(
+                        Finding(
+                            "critical",
+                            "broken-link",
+                            page.rel,
+                            "link to `%s` — the file does not exist" % target,
+                            "repair or remove the link",
+                            line=number,
+                        )
+                    )
+                    continue
+                if rel is not None and rel in inbound and rel != page.rel:
+                    inbound[rel] += 1
+                if anchor and rel in headings and anchor not in headings[rel]:
+                    findings.append(
+                        Finding(
+                            "critical",
+                            "broken-anchor",
+                            page.rel,
+                            "link to `%s#%s` — no such heading on that page" % (target, anchor),
+                            "fix the anchor or add the heading",
+                            line=number,
+                        )
+                    )
+
+    for page in pages:
+        name = Path(page.rel).name
+        # index.md is the root; README.md is the human contract page and log.md
+        # is append-only bookkeeping — none of the three need inbound links.
+        if page.rel == "index.md" or name in NO_FRONTMATTER:
+            continue
+        if name.startswith("_"):  # modules/_TEMPLATE.md
+            continue
+        if inbound.get(page.rel, 0) == 0:
+            findings.append(
+                Finding(
+                    "warning",
+                    "orphan-page",
+                    page.rel,
+                    "no inbound link from index.md or any other page",
+                    "add an index.md Map row / Also see entry, or delete the page",
+                )
+            )
+
+
+def check_budgets(pages, findings):
+    for page in pages:
+        name = Path(page.rel).name
+        if page.rel == "index.md":
+            budget = BUDGETS["index.md"]
+        elif name == "data-sources.md":
+            budget = BUDGETS["data-sources.md"]
+        elif page.rel.startswith("modules/") and not name.startswith("_"):
+            budget = BUDGETS["modules"]
+        else:
+            continue
+        count = len(page.lines)
+        if count > budget:
+            findings.append(
+                Finding(
+                    "suggestion",
+                    "oversized-page",
+                    page.rel,
+                    "%d lines, budget is ~%d" % (count, budget),
+                    "split it or link out — see references/page-formats.md",
+                )
+            )
+
+
+def check_log(root: Path, findings):
+    log = root / "log.md"
+    if not log.is_file():
+        return
+    entries = 0
+    for number, line in enumerate(
+        log.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
+    ):
+        if not line.startswith("## ["):
+            continue
+        entries += 1
+        match = LOG_ENTRY_RE.match(line)
+        if not match:
+            findings.append(
+                Finding(
+                    "warning",
+                    "log-format",
+                    "log.md",
+                    "entry does not match `## [YYYY-MM-DD] <op> | <summary>`",
+                    "rewrite the prefix; ops are %s" % "/".join(LOG_OPS),
+                    line=number,
+                )
+            )
+            continue
+        op = match.group("op")
+        if not is_placeholder(op) and op not in LOG_OPS:
+            findings.append(
+                Finding(
+                    "warning",
+                    "log-op",
+                    "log.md",
+                    "unknown op `%s`" % op,
+                    "use one of %s" % "/".join(LOG_OPS),
+                    line=number,
+                )
+            )
+    if entries == 0:
+        findings.append(
+            Finding(
+                "suggestion",
+                "log-empty",
+                "log.md",
+                "no `## [date] op | summary` entries",
+                "append one per init/update/lint/upgrade",
+            )
+        )
+
+
+def check_secrets(pages, findings, label=""):
+    for page in pages:
+        for number, line in enumerate(page.lines, start=1):
+            for code, pattern, description in SECRET_PATTERNS:
+                match = pattern.search(line)
+                if not match:
+                    continue
+                value = match.group("value")
+                if is_placeholder(value) or is_placeholder(line):
+                    continue
+                if value.strip("*") == "" or value.lower() in {"none", "null", "env", "secret"}:
+                    continue
+                findings.append(
+                    Finding(
+                        "critical",
+                        code,
+                        (label + page.rel) if label else page.rel,
+                        "looks like %s" % description,
+                        "move the value to a secret store / env var and leave only its name",
+                        line=number,
+                    )
+                )
+                break
+
+
+def check_data_source_tiers(pages, findings):
+    page = next((p for p in pages if Path(p.rel).name == "data-sources.md"), None)
+    if page is None:
+        return
+    for number, line in enumerate(page.lines, start=1):
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip().strip("*`_").lower() for c in line.strip().strip("|").split("|")]
+        hits = [c for c in cells if c in CATALOG_ONLY_COLUMNS]
+        if hits:
+            findings.append(
+                Finding(
+                    "warning",
+                    "tier-violation",
+                    page.rel,
+                    "column(s) %s belong in the user-global catalog, not the repo page"
+                    % ", ".join(sorted(hits)),
+                    "move connection detail to ~/.claude/llm-wiki/data-sources.md, "
+                    "joined by Name",
+                    line=number,
+                )
+            )
+            break
+
+
+def catalog_path() -> Path:
+    override = os.environ.get("LLM_WIKI_CATALOG")
+    if override:
+        return Path(override)
+    home = Path(os.environ.get("USERPROFILE") or Path.home())
+    return home / ".claude" / "llm-wiki" / "data-sources.md"
+
+
+# --------------------------------------------------------------------------
+# driver
+
+
+def lint(root: Path, check_catalog: bool = True, scaffold: bool = False):
+    findings = []
+    if not scaffold:
+        check_required_pages(root, findings)
+    pages = collect_pages(root)
+    for page in pages:
+        check_frontmatter(page, findings)
+    check_contract(root, pages, findings)
+    if not scaffold:
+        # templates/wiki/ links to illustrative module pages (modules/api.md,
+        # modules/web.md …) that exist only in the repo the template is copied
+        # into, and every page is unreferenced until an index is written.
+        check_links(root, pages, findings)
+    check_budgets(pages, findings)
+    check_log(root, findings)
+    check_secrets(pages, findings)
+    check_data_source_tiers(pages, findings)
+
+    if check_catalog:
+        catalog = catalog_path()
+        if catalog.is_file():
+            check_secrets(
+                [Page(catalog, catalog.parent)], findings, label="<user-global catalog>/"
+            )
+    return findings
+
+
+def report(findings, root: Path, fail_on: str) -> int:
+    counts = {name: 0 for name in SEVERITIES}
+    for finding in findings:
+        counts[finding.severity] += 1
+
+    print("=== llm-wiki lint: %s ===" % root)
+    if not findings:
+        print("  clean — no findings")
+    else:
+        by_code = {}
+        for finding in findings:
+            by_code.setdefault(finding.code, []).append(finding)
+        order = {name: index for index, name in enumerate(reversed(SEVERITIES))}
+        for code in sorted(by_code, key=lambda c: (order[by_code[c][0].severity], c)):
+            group = by_code[code]
+            print("")
+            print("--- %s (%s) ---" % (code, group[0].severity))
+            for finding in group:
+                where = finding.path
+                if finding.line:
+                    where += ":%d" % finding.line
+                print("  %s — %s" % (where, finding.message))
+                print("      fix: %s" % finding.fix)
+
+    print("")
+    print(
+        "%d critical, %d warning, %d suggestion"
+        % (counts["critical"], counts["warning"], counts["suggestion"])
+    )
+    threshold = SEVERITY_RANK[fail_on]
+    gated = sum(count for name, count in counts.items() if SEVERITY_RANK[name] >= threshold)
+    if gated:
+        print("FAIL: %d finding(s) at or above `%s`" % (gated, fail_on))
+        return 1
+    return 0
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="llm-wiki",
+        description="Deterministic checks for a .llm-wiki/ knowledge base.",
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    lint_parser = sub.add_parser("lint", help="Check a .llm-wiki/ directory.")
+    lint_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".llm-wiki",
+        help="Path to the .llm-wiki/ directory (default: ./.llm-wiki).",
+    )
+    lint_parser.add_argument(
+        "--fail-on",
+        choices=SEVERITIES,
+        default="critical",
+        help="Exit non-zero when a finding at or above this severity exists.",
+    )
+    lint_parser.add_argument("--json", action="store_true", help="Emit findings as JSON.")
+    lint_parser.add_argument(
+        "--scaffold",
+        action="store_true",
+        help="Treat PATH as template/example scaffolding, not an installed wiki: "
+        "skip the required-page, link and orphan checks.",
+    )
+    lint_parser.add_argument(
+        "--no-catalog",
+        action="store_true",
+        help="Skip the user-global data-source catalog secret scan.",
+    )
+
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.print_help()
+        return 2
+
+    root = Path(args.path)
+    if root.name != ".llm-wiki" and (root / ".llm-wiki").is_dir():
+        root = root / ".llm-wiki"
+    if not root.is_dir():
+        print("error: no such directory: %s" % root, file=sys.stderr)
+        return 2
+
+    findings = lint(root, check_catalog=not args.no_catalog, scaffold=args.scaffold)
+
+    if args.json:
+        payload = {
+            "schema_version": 1,
+            "root": str(root),
+            "current_contract": CURRENT_CONTRACT,
+            "findings": [f.as_dict() for f in findings],
+        }
+        print(json.dumps(payload, indent=2))
+        threshold = SEVERITY_RANK[args.fail_on]
+        return 1 if any(SEVERITY_RANK[f.severity] >= threshold for f in findings) else 0
+
+    return report(findings, root, args.fail_on)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

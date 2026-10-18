@@ -8,6 +8,25 @@ base — from personal research to **code repositories**. Instead of an agent re
 structure every session (broad searches, reading whole files, rediscovering conventions), each repo
 carries a small compiled map under `.llm-wiki/` that the agent reads first.
 
+## Changelog
+
+**Unreleased** — **Deterministic checks and a tested Copilot surface.** Adds `scripts/llm-wiki`, a
+model-free lint CLI with `--fail-on critical|warning|suggestion` that `/llm-wiki:lint` and
+`/llm-wiki-lint` now run first, and that ships into Copilot repos at `.llm-wiki/bin/llm-wiki`. Adds a
+`tests/` suite (manifest and frontmatter validation, wiki structure, defect fixtures, Claude↔Copilot
+parity, docs consistency, token budgets) and a GitHub Actions workflow. The Copilot lint prompt
+gains the data-source tier, secret-leak and contract-drift checks it had been missing, the example
+wikis are stamped to contract 2 and carry their `README.md`, and both installers ship every prompt.
+
+**v0.4.0** — **Repo-scoped data-source tier and `/llm-wiki:upgrade`.** Splits data sources into a
+user-global connection catalog and a per-repo usage page, and adds a command that retrofits an older
+`.llm-wiki/` to the current structural contract.
+
+**v0.3.0** — **HTML view layer.** `/llm-wiki:view` builds a human-only review dashboard from the
+Markdown canon, and data-source mapping is extended to SAS/saspy.
+
+**v0.2.0** — **PostgreSQL, R and Slurm support**, plus the shared data-source instructions.
+
 ## What it does
 
 - Installs a `.llm-wiki/` knowledge base into any repo: a **map** of where code lives, an
@@ -222,8 +241,10 @@ The bundled `llm-wiki` skill also triggers automatically when you work in a repo
 ## Using it with each tool
 
 `/llm-wiki:init` writes the same knowledge base once (`.llm-wiki/`) and three thin pointer files, one
-per tool, each pointing into it. You only run the plugin from Claude Code; the other tools just read
-the files it leaves in the repo — no plugin needed on their side.
+per tool, each pointing into it. It also leaves behind the Copilot prompt files
+(`.github/prompts/llm-wiki-*.prompt.md`) and the deterministic lint CLI (`.llm-wiki/bin/llm-wiki`), so
+the other tools get the full workflow and not just the pointer. You only run the plugin from Claude
+Code; the other tools just read the files it leaves in the repo — no plugin needed on their side.
 
 > **Note:** the pointer files are generated **into the repo you run `init` in**, not into this plugin
 > repo. Here they exist only as templates under [`templates/pointers/`](templates/pointers/). So if
@@ -266,6 +287,8 @@ own content, and reports `created` / `updated` / `ok` per file). Options:
 | `--r` | `-R` | install `r.instructions.md` even if R isn't detected |
 | `--slurm` | `-Slurm` | install `slurm.instructions.md` even if no Slurm scripts are detected |
 | `--no-path-instructions` | `-NoPathInstructions` | never install path-scoped instructions |
+| `--no-cli` | `-NoCli` | don't install the deterministic lint CLI (`.llm-wiki/bin/llm-wiki`) |
+| `--data-sources-profile-dir DIR` | `-DataSourcesProfileDir DIR` | write a user-global `llm-wiki-data-sources.instructions.md` into that VS Code profile instructions folder, generated from `~/.claude/llm-wiki/data-sources.md`. Applies in every workspace; VS Code only. Omit to just print the setup steps |
 
 The PowerShell script works on Windows PowerShell 5.1 and writes UTF-8 **without** a BOM, so it
 won't prepend one to your existing `CLAUDE.md`/`AGENTS.md`. The pointer is most useful once
@@ -288,14 +311,28 @@ UIs show `copilot-instructions.md` as a referenced file in the response.
 
 The pointer only pays off once `.llm-wiki/` is filled in. Copilot has no `/llm-wiki:init` plugin
 command, but VS Code supports **prompt files** — reusable prompts that show up as `/`-commands in
-Copilot Chat. The installer drops three into `.github/prompts/`:
+Copilot Chat. The installer drops five into `.github/prompts/` — one per plugin command, so the
+Copilot surface stays level with the Claude one:
 
 | Prompt | Copilot Chat command | Does |
 |--------|----------------------|------|
 | `llm-wiki-init.prompt.md` | `/llm-wiki-init` | scans the repo and fills in / creates the wiki pages |
 | `llm-wiki-update.prompt.md` | `/llm-wiki-update` | refreshes affected pages after code changes |
-| `llm-wiki-lint.prompt.md` | `/llm-wiki-lint` | health-checks the wiki for drift and broken links |
+| `llm-wiki-lint.prompt.md` | `/llm-wiki-lint` | health-checks the wiki for drift, broken links, contract staleness and leaked credentials |
+| `llm-wiki-upgrade.prompt.md` | `/llm-wiki-upgrade` | retrofits an older wiki to the current structural contract |
 | `llm-wiki-view.prompt.md` | `/llm-wiki-view` | builds the human-only HTML review dashboard (`.llm-wiki/view/index.html`) |
+
+The installer also drops the **deterministic lint CLI** at `.llm-wiki/bin/llm-wiki` (skip it with
+`--no-cli`). `/llm-wiki-lint` and `/llm-wiki-upgrade` start from it:
+
+```bash
+python3 .llm-wiki/bin/llm-wiki lint --fail-on warning
+```
+
+It checks frontmatter, the contract stamp, required pages, broken links and anchors, orphan pages,
+size budgets, the `log.md` format, leaked credentials and data-source tier violations — with no model
+at all, so it is free, instant, and usable in CI. The prompts fall back to doing those checks
+themselves when the script or Python isn't available, so nothing depends on it.
 
 To populate: run **`/llm-wiki-init`** in Copilot Chat. The prompts carry no `agent:` in their
 frontmatter, so they run in whichever mode you have selected — **ask**, **plan**, **agent**, or a
@@ -342,12 +379,36 @@ examples/         node-app/ + python-webapp/ + python-analytics/ + hybrid-app/
                   + tsql-database/ + tsql-warehouse/ + postgres-database/ + r-analysis/
                   + hpc-slurm/ (worked reference wikis)
 scripts/          install-copilot.sh / .ps1 (install the Copilot integration without Claude Code)
+                  + llm-wiki (deterministic lint CLI — no model, usable in CI and by Copilot)
+tests/            structural validation + the defect fixtures and token budgets it runs against
 docs/             html-view-layer.md (why the view exists) + upgrading.md (retrofitting old wikis)
 ```
 
 Pointer files are written as a delimited `<!-- BEGIN llm-wiki --> … <!-- END llm-wiki -->` block, so
 `init`/`update` merge into an existing `CLAUDE.md`/`AGENTS.md`/`copilot-instructions.md` without
 clobbering your own content.
+
+## Tests
+
+Everything here is Markdown and shell, so the checks are structural — no model, no API key, instant:
+
+```bash
+./tests/generate-defect-fixtures.sh   # rebuild the deliberately-broken wikis (gitignored)
+./tests/test-plugin-validate.sh       # manifests, version sync, command/skill frontmatter,
+                                      #   and every ${CLAUDE_PLUGIN_ROOT} path the commands cite
+./tests/test-docs-consistency.sh      # README tables vs the files that actually ship
+./tests/test-structure.sh             # the lint CLI over templates/wiki and all nine examples
+./tests/test-lint-cli.sh              # every lint check fires on its defect fixture
+./tests/test-copilot-parity.sh        # each command has a prompt covering the same checks
+./tests/test-token-budgets.sh         # the plugin's own always-loaded text stays small
+```
+
+CI runs all of them on push and pull request (`.github/workflows/plugin-tests.yml`).
+
+**The parity rule:** a change to a check list in `commands/*.md` is not done until the matching
+`templates/copilot-prompts/llm-wiki-*.prompt.md` carries it. `test-copilot-parity.sh` enforces this —
+it exists because the data-source and contract checks reached Claude and silently never reached
+Copilot.
 
 ## The idea
 

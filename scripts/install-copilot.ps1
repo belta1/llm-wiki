@@ -6,8 +6,9 @@
   GitHub Copilot has no plugin system; it reads repository custom instructions from
   .github/copilot-instructions.md. This script installs that pointer file (merging into any
   existing one via a managed block) so Copilot is told to read the repo's .llm-wiki/ knowledge
-  base first, plus the /llm-wiki-* prompt files. Optionally it also scaffolds .llm-wiki/ from the
-  bundled templates.
+  base first, plus the /llm-wiki-* prompt files (/llm-wiki-init, -update, -lint, -upgrade, -view)
+  and the deterministic lint CLI at .llm-wiki\bin\llm-wiki. Optionally it also scaffolds
+  .llm-wiki\ from the bundled templates.
 
   It also installs path-scoped instructions (.github/instructions/<stack>.instructions.md) for
   each stack it detects in the target:
@@ -48,6 +49,10 @@
 .PARAMETER NoPathInstructions
   Never install path-scoped instructions (.github/instructions/*.instructions.md).
 
+.PARAMETER NoCli
+  Don't install the deterministic lint CLI (.llm-wiki\bin\llm-wiki). The /llm-wiki-lint and
+  /llm-wiki-upgrade prompts then do every check themselves instead of starting from its output.
+
 .PARAMETER DataSourcesProfileDir
   Write/refresh the cross-project data-source instruction file into this VS Code *user-profile*
   instructions directory. The file (llm-wiki-data-sources.instructions.md) is generated from
@@ -73,6 +78,7 @@ param(
   [Alias("R")][switch]$RLang,
   [switch]$Slurm,
   [switch]$NoPathInstructions,
+  [switch]$NoCli,
   [string]$DataSourcesProfileDir = ""
 )
 
@@ -301,12 +307,24 @@ if ($View) {
 # 2) Install the Copilot pointer (always).
 Install-Block (Join-Path $Templates "pointers\copilot-instructions.md") (Join-Path $Target ".github\copilot-instructions.md")
 
-# 2b) Install Copilot prompt files - the /llm-wiki-init|update|lint commands for VS Code Copilot Chat.
+# 2b) Install Copilot prompt files - /llm-wiki-init, -update, -lint, -upgrade and -view in VS Code
+# Copilot Chat. Globbed, so a prompt added to the plugin ships without editing this script.
 $promptsSrc = Join-Path $Templates "copilot-prompts"
 if (Test-Path $promptsSrc) {
   $promptsDest = Join-Path $Target ".github\prompts"
   Get-ChildItem -LiteralPath $promptsSrc -Filter "*.prompt.md" | ForEach-Object {
     Install-File $_.FullName (Join-Path $promptsDest $_.Name)
+  }
+}
+
+# 2b-ii) Install the deterministic lint CLI next to the wiki it checks. Copilot has no
+# ${CLAUDE_PLUGIN_ROOT}, so the script has to live in the target repo for /llm-wiki-lint to run it.
+if (-not $NoCli) {
+  $cliSrc = Join-Path $PluginRoot "scripts\llm-wiki"
+  if (Test-Path $cliSrc) {
+    Install-File $cliSrc (Join-Path $Target ".llm-wiki\bin\llm-wiki")
+  } else {
+    Write-Host "  skip     lint CLI not found at $cliSrc"
   }
 }
 
@@ -344,8 +362,12 @@ Write-Host "  - In VS Code, ensure setting 'github.copilot.chat.codeGeneration.u
 Write-Host "    (default in current versions). github.com/mobile Copilot picks it up automatically."
 Write-Host "  - To POPULATE the wiki, open Copilot Chat in VS Code (Agent mode) and run '/llm-wiki-init'"
 Write-Host "    (prompt files may need the 'chat.promptFiles' setting enabled). Later: /llm-wiki-update,"
-Write-Host "    /llm-wiki-lint. No VS Code? Paste .github\prompts\llm-wiki-init.prompt.md into any"
-Write-Host "    Copilot agent chat."
+Write-Host "    /llm-wiki-lint, /llm-wiki-upgrade. No VS Code? Paste .github\prompts\llm-wiki-init.prompt.md"
+Write-Host "    into any Copilot agent chat."
+if (-not $NoCli) {
+  Write-Host "  - '/llm-wiki-lint' starts from 'python .llm-wiki\bin\llm-wiki lint', which does the"
+  Write-Host "    mechanical checks with no model at all. Run it yourself any time, or in CI."
+}
 Write-Host "  - For a human review dashboard, run '/llm-wiki-view' (or re-run this script with -View) to"
 Write-Host "    build .llm-wiki\view\index.html, then open it in VS Code's Simple Browser. It's derived"
 Write-Host "    from the Markdown and gitignored; agents keep reading the Markdown."

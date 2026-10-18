@@ -183,10 +183,26 @@ closest worked example for page shape and brevity:
      These files are plugin-owned; replace them if they exist. If the repo's `#SBATCH` scripts are
      plain `*.sh`, widen the `slurm` file's `applyTo` to their real paths (e.g.
      `"**/*.{sbatch,slurm},slurm/**/*.sh"`).
+   - **Copilot prompt files:** copy every
+     `${CLAUDE_PLUGIN_ROOT}/templates/copilot-prompts/llm-wiki-*.prompt.md` to `.github/prompts/`.
+     These are the `/llm-wiki-init`, `-update`, `-lint`, `-upgrade` and `-view` equivalents of these
+     commands for Copilot users. The pointer block you just wrote refers to them, so a repo without
+     them points at commands that don't exist. Plugin-owned; replace them if present.
+   - **The deterministic lint CLI:** copy `${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki` to
+     `.llm-wiki/bin/llm-wiki`. Copilot has no `${CLAUDE_PLUGIN_ROOT}`, so this is the only way the
+     `/llm-wiki-lint` and `/llm-wiki-upgrade` prompts can run it. Commit it — it is tooling, not a
+     build artifact, so it does **not** go in `.gitignore`. Skip it only if the user says they don't
+     want a script committed.
 
-5. **Append the first `log.md` entry**: `## [<today>] init | <one-line summary of what was created>`.
+5. **Check your own work.** Run
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki" lint .llm-wiki --fail-on warning` and fix what it
+   reports before telling the user you're done. Writing a dozen interlinked pages by hand reliably
+   produces a broken link, a missing `status:` or an over-budget index; this catches all of it in one
+   cheap pass instead of a later `/llm-wiki:lint`.
 
-6. **Report** to the user: the pages created, the modules covered, **data sources** at both tiers
+6. **Append the first `log.md` entry**: `## [<today>] init | <one-line summary of what was created>`.
+
+7. **Report** to the user: the pages created, the modules covered, **data sources** at both tiers
    (added to or matched in the cross-project catalog, and listed on `data-sources.md` — say if you
    created that page or deliberately did not), any credential you found inlined in code, and
    anything you were unsure about or deliberately left thin,

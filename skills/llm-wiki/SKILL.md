@@ -145,3 +145,15 @@ If the plugin is installed, these commands drive the wiki explicitly:
 (health-check), `/llm-wiki:upgrade` (retrofit an older wiki to the current structural contract),
 `/llm-wiki:view` (build the human-only HTML review dashboard from the canon). You can
 also do any of this by hand following the guidance above.
+
+There is also a deterministic, model-free check:
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki" lint .llm-wiki
+```
+
+(or `.llm-wiki/bin/llm-wiki` in a repo set up for Copilot). It verifies frontmatter, the contract
+stamp, required pages, broken links and anchors, orphan pages, size budgets, the `log.md` format,
+leaked credentials and data-source tier violations. Run it after you edit wiki pages — it is far
+cheaper than re-reading them, and it catches the mechanical mistakes that are easy to make while
+writing Markdown by hand.

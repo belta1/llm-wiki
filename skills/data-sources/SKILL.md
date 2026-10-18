@@ -132,6 +132,13 @@ source **without** the secret, note `⚠ inlined in <path>` where the credential
 report it so the human can move it to an env var or secret store, and do not copy the value
 anywhere. Never silently rewrite their source to "fix" it.
 
+When the repo has a `.llm-wiki/`, `python3 .llm-wiki/bin/llm-wiki lint` (or
+`${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki`) scans both tiers for exactly these patterns — literal
+`PWD=`/`Password=` values, presigned and SAS URLs, AWS key ids, private keys, service-account keys and
+API tokens — and reports each as `critical` with a file and line. Run it after you touch either tier;
+it is the cheapest way to be sure you didn't write a secret down. It only *reports*: moving the value
+is the human's call.
+
 ## References & related commands
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/data-sources.md` — record format, two tiers,

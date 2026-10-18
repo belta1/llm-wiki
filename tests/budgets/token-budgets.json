@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "_comment": "Byte/char budgets for always-loaded and lazily-loaded plugin text. tests/test-token-budgets.sh fails when a metric exceeds max. Raise a baseline deliberately, in the same commit as the growth.",
+  "metrics": {
+    "agents_pointer_bytes": {
+      "baseline": 1345,
+      "max": 1468
+    },
+    "claude_pointer_bytes": {
+      "baseline": 1347,
+      "max": 1470
+    },
+    "copilot_path_instructions_bytes": {
+      "baseline": 12303,
+      "max": 13303
+    },
+    "copilot_pointer_bytes": {
+      "baseline": 1477,
+      "max": 1611
+    },
+    "copilot_prompts_bytes": {
+      "baseline": 32132,
+      "max": 34718
+    },
+    "lazy_commands_bytes": {
+      "baseline": 47367,
+      "max": 52119
+    },
+    "lazy_references_bytes": {
+      "baseline": 82696,
+      "max": 90981
+    },
+    "plugin_description_chars": {
+      "baseline": 1032,
+      "max": 1130
+    },
+    "skill_data_sources_bytes": {
+      "baseline": 10404,
+      "max": 11460
+    },
+    "skill_data_sources_description_chars": {
+      "baseline": 1517,
+      "max": 1654
+    },
+    "skill_llm_wiki_bytes": {
+      "baseline": 11449,
+      "max": 12609
+    },
+    "skill_llm_wiki_description_chars": {
+      "baseline": 763,
+      "max": 840
+    },
+    "wiki_templates_bytes": {
+      "baseline": 22350,
+      "max": 24601
+    }
+  }
+}

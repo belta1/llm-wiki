@@ -15,6 +15,10 @@ source of truth; if a page disagrees with the code, fix the page.
 
 See [`.llm-wiki/README.md`](.llm-wiki/README.md) for the full contract.
 
+After editing wiki pages, run `python3 .llm-wiki/bin/llm-wiki lint` if that script is present:
+it checks links, frontmatter, orphans, size budgets and accidentally committed credentials
+with no model cost.
+
 _Humans:_ `/llm-wiki:view` builds a rendered review dashboard at `.llm-wiki/view/index.html` (opens
 as an Artifact). It's for people, not agents — read the Markdown above, not the generated HTML.
 <!-- END llm-wiki -->

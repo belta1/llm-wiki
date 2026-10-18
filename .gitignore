@@ -1,0 +1,13 @@
+# Generated HTML review dashboard — rebuild with /llm-wiki:view
+.llm-wiki/view/
+
+# Local Claude Code session state
+.claude/scheduled_tasks.lock
+
+# Test scratch
+tests/fixtures/defects/
+tests/tmp/
+
+# Python
+__pycache__/
+*.py[cod]

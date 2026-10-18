@@ -37,3 +37,8 @@ Maintained with the `llm-wiki` Claude Code plugin (`/llm-wiki:init`, `:update`, 
 `:view`), the Copilot prompt files in `.github/prompts/` (`/llm-wiki-init`, `/llm-wiki-update`,
 `/llm-wiki-lint`, `/llm-wiki-upgrade`, `/llm-wiki-view`), or by hand. Humans curate and direct; the
 agent does the bookkeeping.
+
+If `bin/llm-wiki` is present, `python3 .llm-wiki/bin/llm-wiki lint` checks this directory's structure
+— frontmatter, links, orphans, size budgets, the log format and accidentally committed credentials —
+with no model involved, so it is free to run here or in CI (on Windows: `python`). It is the mechanical half of the lint;
+the judgement half (does this still describe the code?) needs an agent.

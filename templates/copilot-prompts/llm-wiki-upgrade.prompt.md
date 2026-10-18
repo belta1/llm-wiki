@@ -12,10 +12,35 @@ This is about structure, not content. Whether the pages still *describe the code
 
 ## Steps
 
+0. **Ask the deterministic check first.** If `.llm-wiki/bin/llm-wiki` exists, run:
+
+   ```
+   python3 .llm-wiki/bin/llm-wiki lint
+   ```
+
+   It reports the level directly as `contract-stale` (with the number), `contract-missing` (no stamp)
+   or `contract-ahead` (built by a newer plugin), so step 1 needs no file reading. It also flags
+   `contract-misplaced` — the stamp copied onto a page other than `index.md`, which is always wrong
+   and which you should fix while you are here. If the script or Python is unavailable, do step 1 by
+   hand. On Windows the interpreter is `python`, not `python3`.
+
 1. **Read the stamp.** Check `index.md`'s YAML frontmatter for `wiki_contract:`.
    - **`wiki_contract: 2`** — already current. Say so and stop.
    - **lower than 2** — apply only the changes listed below that are actually missing, then restamp.
    - **absent** — the wiki predates the stamp. Diagnose everything below by content.
+
+1b. **Tooling check — do this at every level, including "already current".** These are not contract
+   items, so a wiki whose stamp is already correct will never acquire them any other way. Report each
+   as present or missing, offer to add it, and leave `wiki_contract` alone either way:
+   - `.llm-wiki/bin/llm-wiki` — the deterministic lint CLI that `/llm-wiki-lint` starts from. If it
+     is missing, the llm-wiki installer adds it (`scripts/install-copilot.sh <repo>`); mention that
+     rather than trying to write the script yourself.
+   - `.github/prompts/llm-wiki-*.prompt.md` — there should be one per command: `init`, `update`,
+     `lint`, `upgrade`, `view`. A pointer block that names a prompt whose file is absent sends
+     Copilot after a command that does not exist.
+
+   Never report the wiki as *stale* over these. A stamp means its layout is current, and that stays
+   true whether or not the helpers are installed.
 
 2. **Check each of these, and report present / missing:**
    - **`data-sources.md`** — missing, *and* this repo's code connects to at least one external data

@@ -2,6 +2,7 @@
 updated: 2026-09-23
 covers: [overview, navigation]
 status: current
+wiki_contract: 2
 ---
 
 # Index — tasks-api

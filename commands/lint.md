@@ -10,6 +10,26 @@ the safe, unambiguous fixes after reporting; otherwise report only and ask befor
 
 Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init`.
 
+## Step 0 — run the deterministic pass first
+
+Before reading any page, run:
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki" lint .llm-wiki
+```
+
+(In a repo that only has the Copilot install, the same script is at `.llm-wiki/bin/llm-wiki`.)
+
+It does checks **1, 3, 5, 8, 9a, 9c, 9d and 10** with no model at all — frontmatter, the contract
+stamp, required pages, broken links and anchors, orphans, size budgets, log format, secret values
+and tier violations — and prints each with a file, a line and a one-line fix.
+
+Report its findings verbatim in your own report, then spend your reading budget only on what it
+cannot do: **2, 4, 6, 7, 7b and 9b**, which all need the *code* read. Do not re-derive by hand
+anything it already answered.
+
+If the script is missing or Python is unavailable, say so in one line and do every check yourself.
+
 ## Checks
 
 1. **Broken cross-links** — links between wiki pages, and paths cited in the index/module pages, that

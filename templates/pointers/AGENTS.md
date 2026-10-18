@@ -15,6 +15,10 @@ if a page disagrees with the code, fix the page.
 
 See `.llm-wiki/README.md` for the full contract.
 
+After editing wiki pages, run `python3 .llm-wiki/bin/llm-wiki lint` if that script is present:
+it checks links, frontmatter, orphans, size budgets and accidentally committed credentials
+with no model cost.
+
 _Humans:_ a rendered review dashboard can be built at `.llm-wiki/view/index.html` (`/llm-wiki:view`
 or the `/llm-wiki-view` prompt). It's for people, not agents — read the Markdown above, not the HTML.
 <!-- END llm-wiki -->

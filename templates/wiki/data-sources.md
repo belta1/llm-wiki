@@ -39,7 +39,7 @@ uncommitted catalog hold the real host — the role name then becomes the join k
 - **Used by (code)** — real paths, plus the module page that owns the access.
 - **Direction** — `read` / `write` / `read/write`.
 - **Objects / datasets** — the tables, prefixes, topics, file patterns or endpoints this repo
-  actually touches. The few that matter, not an inventory.
+  actually touches — the few that matter, not an inventory.
 - **Catalog** — `yes` if the source has a row in the user-global catalog; `no (repo-local)` for a
   store that exists only inside this repo or its dev environment.
 
@@ -54,9 +54,8 @@ _One short list: which source feeds which stage, and what this repo produces. Li
 ## Gotchas & constraints
 
 - _Non-obvious constraints an agent must know before touching data access: refresh windows ("the
-  Finance share is only written on the 3rd working day"), row/size limits, timeouts, read-replica
-  lag, required partition layout, rate limits, "never write to PROD from this repo", cost ("every
-  warehouse scan is billed"), and any `⚠ inlined in <path>` credential found._
+  Finance share is only written on the 3rd working day"), row/size limits, timeouts, replica lag,
+  partition layout, rate limits, cost, and any `⚠ inlined in <path>` credential found._
 
 <!-- Optional. Delete if this repo has no local/dev substitute for its real sources.
 ## Local / dev substitutes

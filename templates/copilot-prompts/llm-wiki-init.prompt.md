@@ -142,4 +142,18 @@ llm-wiki installer can add it (path-scoped Copilot guidance per stack).
 - **Real file paths everywhere**, so the reader opens the right file directly.
 - Be honest about uncertainty — mark thin/guessed pages `status: draft`.
 
+## Check your own work
+
+If `.llm-wiki/bin/llm-wiki` exists, finish by running:
+
+```
+python3 .llm-wiki/bin/llm-wiki lint --fail-on warning
+```
+
+On Windows the interpreter is `python`, not `python3`.
+
+It catches the mechanical mistakes that writing interlinked Markdown by hand reliably produces — a
+dead link, a missing `status:`, an over-budget index, a stamp on the wrong page — for no model cost
+at all. Fix what it reports before telling me you're done.
+
 When done, briefly tell me which pages and modules you created and anything you were unsure about.

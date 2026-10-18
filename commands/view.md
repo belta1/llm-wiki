@@ -27,6 +27,8 @@ Requires an existing `.llm-wiki/`. If there is none, suggest `/llm-wiki:init` fi
    - Every page's YAML frontmatter — `updated`, `status`, `covers`.
    - The cross-links between pages (the relative `*.md` links in each page's body).
    - `log.md` — each `## [YYYY-MM-DD] <op> | <summary>` entry.
+   - Skip the two non-page subdirectories: `view/` (this command's own output) and `bin/` (the
+     deterministic lint CLI). Neither is canon and neither belongs in the dashboard.
    - **Data sources this repo uses** — read `data-sources.md` **first** if the wiki has one: it is
      the authoritative repo-scoped list (Name, Engine, Used by, Direction, Objects, Catalog). Only if
      that page is absent, fall back to scanning the repo's connection code (pyodbc / SQLAlchemy /

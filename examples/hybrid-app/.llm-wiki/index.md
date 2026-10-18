@@ -2,6 +2,7 @@
 updated: 2026-09-23
 covers: [overview, navigation, hybrid]
 status: current
+wiki_contract: 2
 ---
 
 # Index — media-jobs

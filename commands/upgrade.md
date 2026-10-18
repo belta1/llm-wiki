@@ -15,14 +15,34 @@ This command syncs the wiki with the **templates** — its structure. It does no
 
 ## Steps
 
-0. **Read the stamp.** Look for `wiki_contract:` in `index.md`'s frontmatter and compare it with
+0. **Read the stamp.** The cheapest way is
+   `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki" lint .llm-wiki` (or `.llm-wiki/bin/llm-wiki` in a
+   Copilot-only repo): it reports `contract-stale`, `contract-missing` or `contract-ahead` with the
+   level, and nothing else here depends on reading the file. Otherwise look for `wiki_contract:` in
+   `index.md`'s frontmatter yourself. Compare it with
    `CURRENT_CONTRACT` in `${CLAUDE_PLUGIN_ROOT}/skills/llm-wiki/references/wiki-contract.md`:
-   - **equal** — report "already at contract N" and **stop**. Nothing else to read.
+   - **equal** — report "already at contract N", do the tooling check below, and **stop**. No wiki
+     page needs reading.
    - **lower** — skip step 1. Apply only the deltas that file lists between the wiki's level and
      current, idempotently (check each is absent before writing — a wiki may have been partly fixed by
      hand or by `/llm-wiki:update`). Then go to step 5.
    - **absent** — the wiki predates the stamp. Continue to step 1 and diagnose by content.
    - **higher** than current — the wiki was built by a newer plugin. Say so and stop; don't downgrade.
+
+0b. **Tooling check — runs at every level, including "already current".** These are *not* contract
+   items: they're optional helpers that a wiki created before they existed will never acquire through
+   the contract, because its stamp is already correct. Report each as present or missing, offer to
+   add the missing ones, and **don't** touch `wiki_contract` either way:
+   - `.llm-wiki/bin/llm-wiki` — the deterministic lint CLI. Copy it from
+     `${CLAUDE_PLUGIN_ROOT}/scripts/llm-wiki`. It is the only way Copilot and Codex users in this repo
+     can run the mechanical checks, since they have no `${CLAUDE_PLUGIN_ROOT}`. Commit it; it is not
+     a build artifact.
+   - `.github/prompts/llm-wiki-*.prompt.md` — one per command. Copy any that are missing from
+     `${CLAUDE_PLUGIN_ROOT}/templates/copilot-prompts/`. A repo whose pointer block names these
+     prompts while the files are absent sends Copilot after commands that don't exist.
+
+   If both are already present, say so in one line. Never report a wiki as *stale* over these — a
+   stamp means its layout is current, and that stays true whether or not the helpers are installed.
 
 1. **Detect drift by content** (unstamped wikis only). Compare against
    `${CLAUDE_PLUGIN_ROOT}/templates/`, and report each as present / missing / partial:

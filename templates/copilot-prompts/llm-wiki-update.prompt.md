@@ -39,7 +39,11 @@ the `llm-wiki-init` prompt instead.)
    **Never** inline or record a password, token, key or presigned/SAS URL. Flag any secret you find
    hard-coded in a connection string.
 4. **Repair cross-links** invalidated by moves/renames/deletes.
-5. **Append** a `log.md` entry: `## [<today>] update | <short summary>`.
+5. **Check your own work.** If `.llm-wiki/bin/llm-wiki` exists, run
+   `python3 .llm-wiki/bin/llm-wiki lint --fail-on warning` (`python` on Windows) and fix
+   what it reports. Step 4 is exactly
+   where a dead link gets left behind, and this confirms you got them all for no model cost.
+6. **Append** a `log.md` entry: `## [<today>] update | <short summary>`.
 
 Keep pages current and small — link, don't duplicate. The code is the source of truth; where the wiki
 disagreed with the code, fix the wiki. Tell me what you updated when done.

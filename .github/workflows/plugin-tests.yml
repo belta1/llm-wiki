@@ -1,0 +1,107 @@
+name: llm-wiki Plugin Tests
+
+on:
+  push:
+    paths:
+      - 'commands/**'
+      - 'skills/**'
+      - 'templates/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - '.claude-plugin/**'
+      - 'README.md'
+      - 'CLAUDE.md'
+      - '.github/workflows/plugin-tests.yml'
+  pull_request:
+    paths:
+      - 'commands/**'
+      - 'skills/**'
+      - 'templates/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - '.claude-plugin/**'
+      - 'README.md'
+      - 'CLAUDE.md'
+      - '.github/workflows/plugin-tests.yml'
+
+jobs:
+  structural:
+    name: Structural validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The plugin is Markdown and shell: no install step, no API key, no model.
+      - name: Make scripts executable
+        run: chmod +x scripts/llm-wiki tests/*.sh
+
+      - name: Generate defect fixtures
+        run: ./tests/generate-defect-fixtures.sh
+
+      - name: Validate plugin manifests and frontmatter
+        run: ./tests/test-plugin-validate.sh
+
+      - name: Validate cross-document consistency
+        run: ./tests/test-docs-consistency.sh
+
+      - name: Validate shipped wikis
+        run: ./tests/test-structure.sh
+
+      - name: Verify every lint check fires
+        run: ./tests/test-lint-cli.sh
+
+      - name: Verify Claude/Copilot parity
+        run: ./tests/test-copilot-parity.sh
+
+      - name: Check token budgets
+        run: ./tests/test-token-budgets.sh
+
+  installer:
+    name: Copilot installer smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: chmod +x scripts/install-copilot.sh scripts/llm-wiki
+
+      - name: Install into a scratch repo
+        run: |
+          mkdir -p /tmp/scratch-repo
+          ./scripts/install-copilot.sh /tmp/scratch-repo --scaffold --view --all-pointers
+
+      - name: Everything landed
+        run: |
+          set -e
+          test -f /tmp/scratch-repo/.github/copilot-instructions.md
+          test -f /tmp/scratch-repo/.llm-wiki/bin/llm-wiki
+          test -f /tmp/scratch-repo/CLAUDE.md
+          test -f /tmp/scratch-repo/AGENTS.md
+          shipped=$(ls templates/copilot-prompts/*.prompt.md | wc -l)
+          installed=$(ls /tmp/scratch-repo/.github/prompts/*.prompt.md | wc -l)
+          echo "prompts: $installed installed / $shipped shipped"
+          test "$installed" = "$shipped"
+
+      - name: The installed CLI runs on the scaffolded wiki
+        run: python3 /tmp/scratch-repo/.llm-wiki/bin/llm-wiki lint /tmp/scratch-repo/.llm-wiki --scaffold --no-catalog --fail-on warning
+
+      - name: Re-running is idempotent
+        run: |
+          set -e
+          ./scripts/install-copilot.sh /tmp/scratch-repo --scaffold --view --all-pointers | tee /tmp/second-run.txt
+          # A second run must report no new files and must not duplicate the managed block.
+          if grep -q "created" /tmp/second-run.txt; then
+            echo "::error::second run created files; the installer is not idempotent"
+            exit 1
+          fi
+          blocks=$(grep -c "BEGIN llm-wiki" /tmp/scratch-repo/.github/copilot-instructions.md)
+          test "$blocks" = "1"
+
+      - name: --no-cli honours the opt-out
+        run: |
+          set -e
+          mkdir -p /tmp/scratch-nocli
+          ./scripts/install-copilot.sh /tmp/scratch-nocli --scaffold --no-cli
+          test ! -f /tmp/scratch-nocli/.llm-wiki/bin/llm-wiki
