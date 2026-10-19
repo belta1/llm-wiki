@@ -35,15 +35,16 @@ W=$(make_fixture broken-link)
 printf '\n[gone](modules/does-not-exist.md)\n' >> "$W/architecture.md"
 
 # 3. bad-frontmatter — a status value outside the allowed set.
+# Edited with python3 rather than `sed -i`: sed rewrites the file's line
+# endings, which turns a one-line defect into a whole-file diff and makes the
+# fixture unreadable. (`sed -i` is also one of the GNU-isms CLAUDE.md warns off.)
 W=$(make_fixture bad-frontmatter)
-sed -i.bak 's/^status: current$/status: fresh/' "$W/conventions.md"
-rm -f "$W/conventions.md.bak"
+python3 "$SCRIPT_DIR/replace-once.py" "$W/conventions.md" "status: current" "status: fresh"
 
 # 4. stamp-on-module-page — the contract key copied where it does not belong.
 W=$(make_fixture stamp-on-module-page)
 MODULE=$(ls "$W/modules/"*.md | head -1)
-sed -i.bak '0,/^status:/s//wiki_contract: 2\nstatus:/' "$MODULE"
-rm -f "$MODULE.bak"
+python3 "$SCRIPT_DIR/replace-once.py" "$MODULE" "status:" "wiki_contract: 2@@EOL@@status:"
 
 # 5. secret-in-data-sources — a literal password in a connection string.
 W=$(make_fixture secret-in-data-sources)
