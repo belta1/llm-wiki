@@ -247,9 +247,10 @@ the other tools get the full workflow and not just the pointer. You only run the
 Code; the other tools just read the files it leaves in the repo — no plugin needed on their side.
 
 > **Note:** the pointer files are generated **into the repo you run `init` in**, not into this plugin
-> repo. Here they exist only as templates under [`templates/pointers/`](templates/pointers/). So if
-> you don't see a `.github/` folder in *this* repo, that's expected — it appears in your target repo
-> after `init`.
+> repo. Here they exist only as templates under [`templates/pointers/`](templates/pointers/) — this
+> repo is the plugin, and has no `.llm-wiki/` of its own. Its `.github/` holds the CI workflow and the
+> instructions for *contributing to the plugin*, which is a different thing from the
+> `copilot-instructions.md` that `init` writes into your repo.
 
 ### Claude Code
 
